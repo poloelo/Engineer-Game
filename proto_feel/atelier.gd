@@ -96,10 +96,20 @@ func _construire_etabli() -> void:
 
 
 func _construire_instruments() -> void:
-	# La feuille est punaisee derriere le ressort : z negatif, tout passe devant.
+	# Le fond est un noeud a part, et non un draw_rect de cet ecran : un enfant en
+	# z negatif passe DERRIERE le dessin de son parent, donc un fond peint ici
+	# recouvrirait la feuille au lieu de la laisser voir.
+	var fond: ColorRect = ColorRect.new()
+	fond.color = FOND
+	fond.size = Vector2(1280.0, 720.0)
+	fond.z_index = -20
+	fond.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(fond)
+
+	# La feuille est punaisee derriere le ressort, devant le fond.
 	_feuille = Feuille.new()
 	_feuille.position = Vector2(300.0, 140.0)
-	_feuille.z_index = -1
+	_feuille.z_index = -10
 	add_child(_feuille)
 
 	_regle = Regle.new()
@@ -513,7 +523,6 @@ func _cible_de_clipsage(ou: Vector2) -> RigidBody2D:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(1280.0, 720.0)), FOND, true)
 	_dessiner_etabli()
 	_dessiner_potence()
 	_dessiner_ressort()
