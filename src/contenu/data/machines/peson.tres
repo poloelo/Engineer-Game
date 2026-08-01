@@ -1,0 +1,58 @@
+[gd_resource type="Resource" script_class="MachineDef" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://src/contenu/cas_test.gd" id="1_nm3to"]
+[ext_resource type="Script" path="res://src/contenu/emplacement_piece.gd" id="2_d3hoe"]
+[ext_resource type="Resource" path="res://src/contenu/data/lois/peson_ressort.tres" id="3_yqodh"]
+[ext_resource type="Resource" path="res://src/contenu/data/primitives/voir.tres" id="4_xvgr7"]
+[ext_resource type="Script" path="res://src/contenu/machine_def.gd" id="5_mm56y"]
+
+[sub_resource type="Resource" id="Resource_uama8"]
+script = ExtResource("1_nm3to")
+etat = {
+"masse": 250.0
+}
+libelle = "masse basse"
+
+[sub_resource type="Resource" id="Resource_rto4j"]
+script = ExtResource("1_nm3to")
+etat = {
+"masse": 480.0
+}
+libelle = "masse moyenne"
+
+[sub_resource type="Resource" id="Resource_4mxie"]
+script = ExtResource("1_nm3to")
+etat = {
+"masse": 815.0
+}
+libelle = "masse haute"
+
+[sub_resource type="Resource" id="Resource_3ypan"]
+script = ExtResource("2_d3hoe")
+id = &"peson_calibre"
+nom = "Peson calibre"
+libelle = "Convertir une lecture de regle en masse."
+gabarit = "a * lecture + b"
+parametres = Array[String](["a", "b"])
+unites_parametres = {
+"a": "g/mm",
+"b": "g"
+}
+entrees_gabarit = Array[StringName]([&"lecture"])
+grandeur_lue = &"longueur"
+grandeur_produite = &"masse"
+primitive_amelioree = &"peser"
+pas_ameliore = 5.0
+
+[resource]
+script = ExtResource("5_mm56y")
+id = &"peson"
+titre = "Le peson"
+symptome = "La balance de l'atelier a un pas de 100 g. Elle ne bouge pas."
+loi_cachee = ExtResource("3_yqodh")
+parametres_caches = {}
+emplacements = Array[ExtResource("2_d3hoe")]([SubResource("Resource_3ypan")])
+cas_test_caches = Array[ExtResource("1_nm3to")]([SubResource("Resource_uama8"), SubResource("Resource_rto4j"), SubResource("Resource_4mxie")])
+etalons = Array[float]([5.0, 10.0, 25.0, 50.0, 100.0, 200.0, 500.0])
+primitive_lue = ExtResource("4_xvgr7")
+matiere_initiale = 12

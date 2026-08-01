@@ -42,9 +42,10 @@ func verifier_proche(
 		_noter("%s : obtenu NAN, attendu %s" % [message, attendu])
 		return
 	if absf(obtenu - attendu) > tolerance:
+		# Le formatage de Godot ne connait pas %g : passer les ecarts en %s.
 		_noter(
 			(
-				"%s : obtenu %.6f, attendu %.6f (ecart %.3g > tolerance %.3g)"
+				"%s : obtenu %.6f, attendu %.6f (ecart %s > tolerance %s)"
 				% [message, obtenu, attendu, absf(obtenu - attendu), tolerance]
 			)
 		)
