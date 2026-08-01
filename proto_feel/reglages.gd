@@ -15,9 +15,13 @@ static var LONGUEUR_REPOS: float = 95.0
 ## Raideur. Plus c'est haut, moins ca s'allonge et plus ca oscille vite.
 static var RAIDEUR: float = 26.0
 
-## Amortissement du ressort. Bas = ca yoyote longtemps, haut = ca se pose vite.
-## Vers 10 l'oscillation disparait completement (regime critique).
+## Amortissement le long de l'axe du ressort : c'est lui qui calme le yoyo.
 static var AMORTISSEMENT: float = 2.4
+
+## Amortissement perpendiculaire a l'axe : c'est lui qui calme le balancement.
+## Separe de l'axial exprès — un ressort qui rebondit court mais balance
+## longtemps ne se regle pas comme l'inverse, et les deux valent d'etre essayes.
+static var AMORTISSEMENT_LATERAL: float = 1.5
 
 ## Amortissement quand la butee est rabattue. Doit etre assez haut pour figer net.
 static var AMORTISSEMENT_BUTEE: float = 26.0
@@ -27,6 +31,15 @@ static var MASSE_RESSORT: float = 0.35
 
 ## Gravite appliquee au ressort ET aux masses libres.
 static var GRAVITE: float = 1500.0
+
+## En dessous de cette vitesse et de cet ecart a l'equilibre, le ressort se pose
+## franchement. Sans ce seuil il fremit indefiniment, ce qui est insupportable
+## quand on essaie de lire une position.
+static var SEUIL_REPOS: float = 3.0
+
+## Retard angulaire d'un maillon sur le precedent. C'est le flottement entre deux
+## masses empilees. A 1.0 la chaine est rigide.
+static var SOUPLESSE_CHAINE: float = 0.22
 
 # --- Traine au curseur -------------------------------------------------------
 
@@ -70,6 +83,28 @@ static var FRICTION: float = 0.62
 
 ## Freinage de roulement, pour qu'une masse finisse par s'arreter.
 static var FREIN_ROULEMENT: float = 1.4
+
+# --- Instruments de trace ----------------------------------------------------
+
+## Distance a laquelle le stylo se clipse sur un element mobile.
+static var RAYON_CLIPSAGE: float = 46.0
+
+## Deplacement minimal de la pointe avant d'ajouter un point a la trace.
+## Bas = trace tres fine mais lourde, haut = trace anguleuse.
+static var PAS_TRACE: float = 1.6
+
+## Distance au bord de la regle en dessous de laquelle le curseur s'aimante sur
+## la graduation la plus proche.
+static var AIMANT_REGLE: float = 26.0
+
+## Distance a la regle a partir de laquelle la loupe apparait.
+static var DISTANCE_LOUPE: float = 90.0
+
+## Rayon de la loupe, en pixels a l'ecran.
+static var RAYON_LOUPE: float = 78.0
+
+## Grossissement de la loupe. En dessous de 2 elle ne sert a rien.
+static var GROSSISSEMENT_LOUPE: float = 3.2
 
 # --- Dessin ------------------------------------------------------------------
 

@@ -12,7 +12,7 @@ func _ready() -> void:
 	layer = 10
 	var fond: PanelContainer = PanelContainer.new()
 	fond.position = Vector2(14.0, 14.0)
-	fond.custom_minimum_size.x = 330.0
+	fond.custom_minimum_size.x = 350.0
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0.03, 0.09, 0.16, 0.92)
 	style.border_color = Color(1.0, 1.0, 1.0, 0.16)
@@ -29,7 +29,7 @@ func _ready() -> void:
 		colonne.add_child(_curseur(ligne[0], ligne[1], ligne[2], ligne[3]))
 
 	var aide: Label = Label.new()
-	aide.text = "Tab : masquer   ·   R : ranger les masses"
+	aide.text = "Tab masquer · R ranger · Espace ou clic droit : pointe · F retourner · P feuille vierge"
 	aide.add_theme_font_size_override("font_size", 11)
 	aide.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.4))
 	colonne.add_child(aide)
@@ -50,7 +50,8 @@ func _input(evenement: InputEvent) -> void:
 func _lignes() -> Array:
 	return [
 		["RAIDEUR", "Raideur ressort", 5.0, 90.0],
-		["AMORTISSEMENT", "Amortissement", 0.0, 14.0],
+		["AMORTISSEMENT", "Amortissement axial", 0.0, 14.0],
+		["AMORTISSEMENT_LATERAL", "Amortissement lateral", 0.0, 14.0],
 		["LONGUEUR_REPOS", "Longueur au repos", 40.0, 200.0],
 		["GRAVITE", "Gravite", 300.0, 3000.0],
 		["RAIDEUR_CURSEUR", "Rappel curseur", 80.0, 1600.0],
@@ -67,6 +68,14 @@ func _lignes() -> Array:
 		["AMORTISSEMENT_BUTEE", "Amortissement butee", 5.0, 60.0],
 		["BALLANT", "Ballant du ressort", 0.0, 0.3],
 		["LARGEUR_SPIRE", "Largeur des spires", 4.0, 40.0],
+		["SOUPLESSE_CHAINE", "Souplesse de la chaine", 0.02, 1.0],
+		["SEUIL_REPOS", "Seuil de repos", 0.0, 14.0],
+		["RAYON_CLIPSAGE", "Rayon de clipsage", 15.0, 130.0],
+		["PAS_TRACE", "Finesse de la trace", 0.5, 10.0],
+		["AIMANT_REGLE", "Aimant de la regle", 5.0, 70.0],
+		["DISTANCE_LOUPE", "Distance de la loupe", 20.0, 220.0],
+		["RAYON_LOUPE", "Rayon de la loupe", 30.0, 160.0],
+		["GROSSISSEMENT_LOUPE", "Grossissement", 1.5, 7.0],
 	]
 
 

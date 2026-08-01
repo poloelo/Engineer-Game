@@ -1,15 +1,22 @@
-# Prototype de feel. Un ressort, un crochet, des masses, une butee, une regle.
-# Aucun objectif, aucun chiffre, rien a gagner. On manipule, c'est tout.
+# Prototype de feel. Un ressort, un crochet, des masses, une butee — et de quoi
+# tracer : une feuille, un stylo, une regle.
+# Aucun objectif, aucun chiffre affiche par le jeu. On manipule, c'est tout.
 #
 # Physique hybride : les masses libres sont des RigidBody2D (chute, rebond,
 # empilement, roulement — le moteur le fait mieux et gratuitement), le ressort
-# est integre a la main sur un seul degre de liberte. Un PinJoint2D chaine
-# donnerait un pendule mou impossible a regler ; deux constantes lisibles se
-# reglent en dix secondes.
+# est integre a la main. Un PinJoint2D chaine donnerait un pendule mou
+# impossible a regler ; deux constantes lisibles se reglent en dix secondes.
+#
+# Le ressort est libre dans le plan : sa force s'applique le long de son axe
+# courant, la gravite reste verticale. Le balancement n'est pas code, il tombe
+# de la combinaison des deux.
 extends Node2D
 
 const Reglages: GDScript = preload("res://reglages.gd")
 const Masse: GDScript = preload("res://masse.gd")
+const Feuille: GDScript = preload("res://feuille.gd")
+const Stylo: GDScript = preload("res://stylo.gd")
+const Regle: GDScript = preload("res://regle.gd")
 const PanneauReglages: GDScript = preload("res://panneau_reglages.gd")
 
 const FOND: Color = Color("0d243d")
@@ -19,14 +26,15 @@ const TRAIT_TRES_EFFACE: Color = Color(0.90, 0.94, 0.97, 0.18)
 const RESSORT: Color = Color("6fd3ff")
 const PRETE: Color = Color("ffb454")
 
-const ANCRE: Vector2 = Vector2(640.0, 96.0)
+const ANCRE: Vector2 = Vector2(700.0, 96.0)
 const SOL: float = 648.0
 const ESPACE_CHAINE: float = 5.0
+const LONGUEUR_MIN: float = 24.0
 
-# --- Etat du ressort ---------------------------------------------------------
+# --- Etat du ressort, libre dans le plan -------------------------------------
 
-var _longueur: float = Reglages.LONGUEUR_REPOS
-var _vitesse: float = 0.0
+var _extremite: Vector2 = ANCRE + Vector2(0.0, Reglages.LONGUEUR_REPOS)
+var _vitesse: Vector2 = Vector2.ZERO
 var _butee: bool = false
 var _butee_angle: float = 0.0
 
@@ -34,6 +42,13 @@ var _butee_angle: float = 0.0
 
 var _chaine: Array[RigidBody2D] = []
 var _libres: Array[RigidBody2D] = []
+## Direction courante de chaque maillon, en retard sur la precedente : c'est le
+## flottement entre deux masses empilees.
+var _directions: Array[Vector2] = []
+
+var _feuille: Node2D = null
+var _stylo: Node2D = null
+var _regle: Node2D = null
 
 # --- Saisie ------------------------------------------------------------------
 
@@ -41,14 +56,17 @@ var _saisie: RigidBody2D = null
 var _saisie_index: int = -1
 var _offset_saisie: Vector2 = Vector2.ZERO
 var _cible: Vector2 = Vector2.ZERO
-var _regle_saisie: bool = false
-var _regle: Vector2 = Vector2(1040.0, 150.0)
 var _point_aimant: Vector2 = Vector2.ZERO
 var _aimant_actif: bool = false
+## Ce que le curseur traine qui n'est pas une masse : la feuille, le stylo, la regle.
+var _outil_saisi: Node2D = null
+var _mode_rotation: bool = false
+var _clipsage_vise: RigidBody2D = null
 
 
 func _ready() -> void:
 	_construire_etabli()
+	_construire_instruments()
 	_construire_crochet()
 	_construire_masses()
 	add_child(PanneauReglages.new())
@@ -59,9 +77,9 @@ func _ready() -> void:
 
 func _construire_etabli() -> void:
 	for donnee: Array in [
-		[Vector2(640.0, SOL + 40.0), Vector2(1400.0, 80.0)],  # plan de travail
-		[Vector2(-30.0, 360.0), Vector2(60.0, 900.0)],  # mur gauche
-		[Vector2(1310.0, 360.0), Vector2(60.0, 900.0)],  # mur droit
+		[Vector2(640.0, SOL + 40.0), Vector2(1400.0, 80.0)],
+		[Vector2(-30.0, 360.0), Vector2(60.0, 900.0)],
+		[Vector2(1310.0, 360.0), Vector2(60.0, 900.0)],
 	]:
 		var mur: StaticBody2D = StaticBody2D.new()
 		mur.position = donnee[0]
@@ -77,6 +95,24 @@ func _construire_etabli() -> void:
 		add_child(mur)
 
 
+func _construire_instruments() -> void:
+	# La feuille est punaisee derriere le ressort : z negatif, tout passe devant.
+	_feuille = Feuille.new()
+	_feuille.position = Vector2(300.0, 140.0)
+	_feuille.z_index = -1
+	add_child(_feuille)
+
+	_regle = Regle.new()
+	_regle.position = Vector2(190.0, 560.0)
+	_regle.z_index = 6
+	add_child(_regle)
+
+	_stylo = Stylo.new()
+	_stylo.position = Vector2(1060.0, SOL - 30.0)
+	_stylo.z_index = 7
+	add_child(_stylo)
+
+
 func _construire_crochet() -> void:
 	var crochet: RigidBody2D = _nouvelle_masse(0.25, 17.0, ANCRE + Vector2(0.0, 120.0))
 	crochet.set("crochet", true)
@@ -84,16 +120,14 @@ func _construire_crochet() -> void:
 
 
 func _construire_masses() -> void:
-	# Huit masses de tailles nettement differentes : c'est l'ecart de poids
-	# ressenti au curseur qu'on teste, il faut qu'il soit franc.
 	var masses: Array[float] = [0.12, 0.18, 0.28, 0.4, 0.6, 0.85, 1.15, 1.5]
-	var x: float = 120.0
+	var x: float = 900.0
 	for m: float in masses:
 		var rayon: float = 13.0 + 21.0 * sqrt(m)
 		_nouvelle_masse(m, rayon, Vector2(x, SOL - rayon - 2.0))
-		x += rayon * 2.0 + 26.0
-		if x > 520.0 and x < 780.0:
-			x = 790.0  # laisser la place sous le ressort
+		x += rayon * 2.0 + 18.0
+		if x > 1240.0:
+			x = 900.0
 
 
 func _nouvelle_masse(masse: float, rayon: float, ou: Vector2) -> RigidBody2D:
@@ -117,55 +151,110 @@ func _physics_process(delta: float) -> void:
 	else:
 		_integrer_ressort(delta)
 
-	_poser_la_chaine()
+	_poser_la_chaine(delta)
 	_traine_au_curseur()
 	_detecter_aimantation()
 	_detecter_chocs()
+	_animer_stylo()
 
 	_butee_angle = lerpf(_butee_angle, -1.15 if _butee else 0.0, 1.0 - pow(0.001, delta))
 	queue_redraw()
 
 
-## Le ressort, integre a la main. Quatre sous-pas : la raideur peut monter haut
-## dans le panneau de reglage sans que ca parte en vrille.
+## Le ressort, libre dans le plan.
+##
+## La force de rappel s'applique le long de l'axe ancrage -> extremite, quelle que
+## soit son orientation. La gravite reste verticale. C'est la combinaison des deux
+## qui produit le pendule, l'ellipse molle et le depart en travers, sans qu'aucun
+## de ces comportements soit ecrit quelque part.
+##
+## L'amortissement est decompose sur l'axe et perpendiculairement a lui, pour que
+## le yoyo et le balancement se reglent separement.
 func _integrer_ressort(delta: float) -> void:
 	var masse: float = Reglages.MASSE_RESSORT + _masse_chaine()
-	var amortissement: float = Reglages.AMORTISSEMENT_BUTEE if _butee else Reglages.AMORTISSEMENT
+	var axial: float = Reglages.AMORTISSEMENT
+	var lateral: float = Reglages.AMORTISSEMENT_LATERAL
+	if _butee:
+		axial = Reglages.AMORTISSEMENT_BUTEE
+		lateral = Reglages.AMORTISSEMENT_BUTEE
+
 	var pas: float = delta / 4.0
 	for i: int in 4:
-		var force: float = (
-			-Reglages.RAIDEUR * (_longueur - Reglages.LONGUEUR_REPOS)
-			+ _masse_chaine() * Reglages.GRAVITE
-			- amortissement * _vitesse * masse
+		var axe: Vector2 = _extremite - ANCRE
+		var longueur: float = maxf(axe.length(), 0.001)
+		var direction: Vector2 = axe / longueur
+
+		# Projection de la vitesse sur l'axe et sur sa perpendiculaire.
+		var v_axiale: Vector2 = direction * _vitesse.dot(direction)
+		var v_laterale: Vector2 = _vitesse - v_axiale
+
+		var force: Vector2 = (
+			-direction * Reglages.RAIDEUR * (longueur - Reglages.LONGUEUR_REPOS)
+			+ Vector2.DOWN * _masse_chaine() * Reglages.GRAVITE
+			- (v_axiale * axial + v_laterale * lateral) * masse
 		)
 		_vitesse += (force / masse) * pas
-		_longueur += _vitesse * pas
-	# Le ressort ne se retourne pas sur lui-meme.
-	if _longueur < 24.0:
-		_longueur = 24.0
-		_vitesse = maxf(_vitesse, 0.0)
+		_extremite += _vitesse * pas
+
+	_contraindre_longueur()
+	_endormir()
 
 
-## On tient une masse accrochee : le ressort suit le curseur. Tirer un peu et
-## lacher relance l'oscillation ; tirer trop fait lacher la prise.
+## Le ressort ne se retourne pas sur lui-meme.
+func _contraindre_longueur() -> void:
+	var axe: Vector2 = _extremite - ANCRE
+	if axe.length() < LONGUEUR_MIN:
+		var direction: Vector2 = axe.normalized() if axe.length() > 0.001 else Vector2.DOWN
+		_extremite = ANCRE + direction * LONGUEUR_MIN
+		_vitesse -= direction * minf(_vitesse.dot(direction), 0.0)
+
+
+## Sans ce seuil le ressort fremit indefiniment, ce qui est insupportable quand
+## on essaie de lire une position au millimetre.
+func _endormir() -> void:
+	if _vitesse.length() > Reglages.SEUIL_REPOS:
+		return
+	var repos: Vector2 = ANCRE + Vector2.DOWN * _longueur_equilibre()
+	if _extremite.distance_to(repos) > Reglages.SEUIL_REPOS:
+		return
+	_extremite = repos
+	_vitesse = Vector2.ZERO
+
+
+## On tient une masse accrochee : l'extremite suit le curseur, dans le plan.
+## Tirer un peu et lacher relance l'oscillation ; tirer trop fait lacher la prise.
 func _tirer_la_chaine(delta: float) -> void:
-	var precedente: float = _longueur
-	var voulue: float = maxf(_cible.y - ANCRE.y - _offset_saisie.y, 24.0)
-	_longueur = lerpf(_longueur, voulue, 1.0 - pow(0.000001, delta))
-	_vitesse = (_longueur - precedente) / maxf(delta, 0.0001)
+	var precedente: Vector2 = _extremite
+	_extremite = _extremite.lerp(_cible - _offset_saisie, 1.0 - pow(0.000001, delta))
+	_contraindre_longueur()
+	_vitesse = (_extremite - precedente) / maxf(delta, 0.0001)
 
-	if _longueur - _equilibre() > Reglages.SEUIL_DECROCHAGE:
+	if (_extremite - ANCRE).length() - _longueur_equilibre() > Reglages.SEUIL_DECROCHAGE:
 		_decrocher_a_partir_de(_saisie_index)
 
 
-func _poser_la_chaine() -> void:
-	var ballant: float = clampf(_vitesse * Reglages.BALLANT, -22.0, 22.0)
-	var y: float = ANCRE.y + _longueur
-	for corps: RigidBody2D in _chaine:
+func _poser_la_chaine(delta: float) -> void:
+	var axe: Vector2 = _extremite - ANCRE
+	var direction: Vector2 = axe.normalized() if axe.length() > 0.001 else Vector2.DOWN
+
+	_directions.resize(_chaine.size())
+	var suivi: float = 1.0 - pow(clampf(1.0 - Reglages.SOUPLESSE_CHAINE, 0.001, 0.999), delta * 60.0)
+
+	var point: Vector2 = _extremite
+	var precedente: Vector2 = direction
+	for i: int in _chaine.size():
+		# Chaque maillon rattrape la direction du precedent avec un peu de retard :
+		# deux masses empilees balancent ensemble, mais pas tout a fait en phase.
+		if _directions[i] == Vector2.ZERO:
+			_directions[i] = precedente
+		_directions[i] = _directions[i].lerp(precedente, suivi).normalized()
+
+		var corps: RigidBody2D = _chaine[i]
 		var rayon: float = corps.get("rayon")
-		corps.global_position = Vector2(ANCRE.x + ballant * 0.35, y + rayon)
-		corps.linear_velocity = Vector2(0.0, _vitesse)
-		y += rayon * 2.0 + ESPACE_CHAINE
+		corps.global_position = point + _directions[i] * rayon
+		corps.linear_velocity = _vitesse
+		point += _directions[i] * (rayon * 2.0 + ESPACE_CHAINE)
+		precedente = _directions[i]
 
 
 ## La traine au curseur. L'amortissement est en racine de la masse pour que le
@@ -189,8 +278,7 @@ func _traine_au_curseur() -> void:
 
 ## L'aimantation se juge sur la position du POINTEUR, pas sur celle de l'objet.
 ## Une masse lourde traine loin derriere le curseur : si on testait l'objet,
-## l'assistance ne se declencherait jamais au moment ou le joueur vise. C'est le
-## defaut le plus penible qu'a revele le premier essai.
+## l'assistance ne se declencherait jamais au moment ou le joueur vise.
 func _detecter_aimantation() -> void:
 	_aimant_actif = false
 	if _saisie == null or _saisie_index >= 0:
@@ -202,18 +290,19 @@ func _detecter_aimantation() -> void:
 	_saisie.queue_redraw()
 
 
-## Une masse qui percute la chaine relance l'oscillation.
+## Une masse qui percute la chaine relance l'oscillation — dans la direction du
+## choc, donc un coup de cote fait balancer.
 func _detecter_chocs() -> void:
 	if _chaine.is_empty():
 		return
 	for corps: RigidBody2D in _libres:
-		if corps == _saisie or absf(corps.linear_velocity.y) < 140.0:
+		if corps == _saisie or corps.linear_velocity.length() < 140.0:
 			continue
 		for maillon: RigidBody2D in _chaine:
 			var portee: float = float(corps.get("rayon")) + float(maillon.get("rayon")) + 6.0
 			if corps.global_position.distance_to(maillon.global_position) < portee:
 				_vitesse += (
-					corps.linear_velocity.y
+					corps.linear_velocity
 					* Reglages.TRANSMISSION_CHOC
 					* corps.mass
 					/ maxf(_masse_chaine(), 0.2)
@@ -222,29 +311,46 @@ func _detecter_chocs() -> void:
 				break
 
 
+# --- Stylo -------------------------------------------------------------------
+
+
+func _animer_stylo() -> void:
+	if _stylo == null:
+		return
+	if _stylo.tenu:
+		_stylo.global_position = _cible - _offset_saisie
+	elif _stylo.support != null and is_instance_valid(_stylo.support):
+		_stylo.global_position = _stylo.support.global_position + _stylo.decalage
+
+	# Le stylo ne trace que si la pointe est baissee et qu'elle touche la feuille.
+	if _stylo.pointe_baissee:
+		_feuille.tracer(_stylo.pointe())
+	else:
+		_feuille.lever()
+
+
 # --- Accrochage --------------------------------------------------------------
 
 
 func _accrocher(corps: RigidBody2D, sursaut: bool = true) -> void:
-	# On pose l'objet exactement au point d'accroche. L'accrochage est franc :
-	# aucun glissement mou vers la position.
 	corps.global_position = _point_libre() + Vector2(0.0, float(corps.get("rayon")))
 	_libres.erase(corps)
 	_chaine.append(corps)
+	_directions.append(Vector2.DOWN)
 	corps.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
 	corps.freeze = true
 	corps.set("accrochee", true)
 	corps.set("prete", false)
 	corps.queue_redraw()
 	if sursaut:
-		# Le ressort accuse le coup : c'est le "clac" de l'accrochage.
-		_vitesse += Reglages.AMPLITUDE_SURSAUT * corps.mass / maxf(_masse_chaine(), 0.2)
+		_vitesse += Vector2.DOWN * Reglages.AMPLITUDE_SURSAUT * corps.mass / maxf(_masse_chaine(), 0.2)
 
 
 func _decrocher_a_partir_de(index: int) -> void:
 	if index < 0 or index >= _chaine.size():
 		return
-	var vitesse: Vector2 = Vector2(0.0, clampf(_vitesse, -900.0, 900.0))
+	var vitesse: Vector2 = _vitesse.limit_length(900.0)
+	var direction: Vector2 = (_extremite - ANCRE).normalized()
 	while _chaine.size() > index:
 		var corps: RigidBody2D = _chaine.pop_back()
 		corps.freeze = false
@@ -252,15 +358,17 @@ func _decrocher_a_partir_de(index: int) -> void:
 		corps.linear_velocity = vitesse
 		corps.queue_redraw()
 		_libres.append(corps)
+		if _stylo != null and _stylo.support == corps:
+			_stylo.declipser()
+	_directions.resize(_chaine.size())
 	_saisie = null
 	_saisie_index = -1
-	# Le ressort se detend d'un coup : recul franc.
-	_vitesse -= Reglages.AMPLITUDE_SURSAUT * 0.7
+	_vitesse -= direction * Reglages.AMPLITUDE_SURSAUT * 0.7
 
 
 func _point_libre() -> Vector2:
 	if _chaine.is_empty():
-		return ANCRE + Vector2(0.0, _longueur)
+		return _extremite
 	return _chaine[-1].call("point_bas")
 
 
@@ -271,7 +379,7 @@ func _masse_chaine() -> float:
 	return total
 
 
-func _equilibre() -> float:
+func _longueur_equilibre() -> float:
 	return Reglages.LONGUEUR_REPOS + _masse_chaine() * Reglages.GRAVITE / maxf(Reglages.RAIDEUR, 1.0)
 
 
@@ -279,33 +387,45 @@ func _equilibre() -> float:
 
 
 func _unhandled_input(evenement: InputEvent) -> void:
-	if evenement is InputEventMouseButton and evenement.button_index == MOUSE_BUTTON_LEFT:
-		if evenement.pressed:
-			_saisir(get_global_mouse_position())
-		else:
-			_lacher()
+	if evenement is InputEventMouseButton:
+		if evenement.button_index == MOUSE_BUTTON_LEFT:
+			if evenement.pressed:
+				_saisir(get_global_mouse_position())
+			else:
+				_lacher()
+		elif evenement.button_index == MOUSE_BUTTON_RIGHT and evenement.pressed:
+			_stylo.basculer_pointe()
 	elif evenement is InputEventKey and evenement.pressed and not evenement.echo:
-		if evenement.keycode == KEY_R:
-			_ranger()
+		match evenement.keycode:
+			KEY_SPACE:
+				_stylo.basculer_pointe()
+			KEY_R:
+				_ranger()
+			KEY_F:
+				_feuille.retourner()
+			KEY_P:
+				_feuille.effacer_face()
 
 
 func _saisir(ou: Vector2) -> void:
-	if _rect_regle().has_point(ou):
-		_regle_saisie = true
-		_offset_saisie = ou - _regle
+	# Ordre de priorite : les instruments sont devant, la feuille est le fond.
+	if _regle.attraper(ou):
+		_outil_saisi = _regle
+		_mode_rotation = _regle.en_rotation
+		_offset_saisie = ou - _regle.global_position
 		return
 
-	if ou.distance_to(_pivot_butee()) < 26.0:
-		_butee = not _butee
+	if _stylo.attraper(ou):
+		_outil_saisi = _stylo
+		_offset_saisie = ou - _stylo.global_position
 		return
 
-	# La chaine avant les masses libres : elle est devant, on la vise en premier.
 	for i: int in range(_chaine.size() - 1, -1, -1):
 		var maillon: RigidBody2D = _chaine[i]
 		if ou.distance_to(maillon.global_position) < float(maillon.get("rayon")) + 6.0:
 			_saisie = maillon
 			_saisie_index = i
-			_offset_saisie = ou - Vector2(ANCRE.x, ANCRE.y + _longueur)
+			_offset_saisie = ou - _extremite
 			return
 
 	for i: int in range(_libres.size() - 1, -1, -1):
@@ -322,9 +442,20 @@ func _saisir(ou: Vector2) -> void:
 			corps.angular_velocity *= 0.2
 			return
 
+	if _feuille.attraper(ou):
+		_outil_saisi = _feuille
+		_offset_saisie = ou - _feuille.global_position
+
 
 func _lacher() -> void:
-	_regle_saisie = false
+	if _outil_saisi != null:
+		if _outil_saisi == _stylo and _clipsage_vise != null:
+			_stylo.clipser(_clipsage_vise)
+		_outil_saisi.call("relacher")
+		_outil_saisi = null
+		_clipsage_vise = null
+		return
+
 	if _saisie == null:
 		return
 	var corps: RigidBody2D = _saisie
@@ -345,13 +476,37 @@ func _ranger() -> void:
 		corps.linear_velocity = Vector2.ZERO
 		corps.angular_velocity = 0.0
 		corps.global_position = Vector2(
-			randf_range(90.0, 1180.0), SOL - float(corps.get("rayon")) - 200.0
+			randf_range(880.0, 1240.0), SOL - float(corps.get("rayon")) - 220.0
 		)
 
 
 func _process(_delta: float) -> void:
-	if _regle_saisie:
-		_regle = get_global_mouse_position() - _offset_saisie
+	var ou: Vector2 = get_global_mouse_position()
+	if _outil_saisi == _regle:
+		if _mode_rotation:
+			_regle.pivoter_vers(ou)
+		else:
+			_regle.global_position = ou - _offset_saisie
+	elif _outil_saisi == _feuille:
+		_feuille.global_position = ou - _offset_saisie
+	elif _outil_saisi == _stylo:
+		# Ou le stylo se clipsera si on lache maintenant.
+		_clipsage_vise = _cible_de_clipsage(ou)
+		_stylo.vise = _clipsage_vise != null
+
+	_regle.definir_curseur(ou)
+
+
+## Element mobile le plus proche du pointeur, dans le rayon de clipsage.
+func _cible_de_clipsage(ou: Vector2) -> RigidBody2D:
+	var meilleure: RigidBody2D = null
+	var distance: float = Reglages.RAYON_CLIPSAGE
+	for corps: RigidBody2D in _chaine + _libres:
+		var d: float = ou.distance_to(corps.global_position)
+		if d < distance:
+			distance = d
+			meilleure = corps
+	return meilleure
 
 
 # --- Dessin ------------------------------------------------------------------
@@ -365,7 +520,9 @@ func _draw() -> void:
 	_dessiner_butee()
 	if _aimant_actif:
 		_dessiner_aimantation()
-	_dessiner_regle()
+	if _clipsage_vise != null:
+		draw_arc(_clipsage_vise.global_position, float(_clipsage_vise.get("rayon")) + 9.0,
+			0.0, TAU, 32, PRETE, 1.5)
 
 
 func _dessiner_etabli() -> void:
@@ -385,12 +542,20 @@ func _dessiner_potence() -> void:
 		)
 
 
-## Le ressort en zigzag : les spires s'ecartent quand il s'etire et il se pince
-## lateralement, comme un vrai. Le ballant lateral vient de la vitesse.
+## Le ressort se dessine le long de son axe courant : penche s'il est penche.
+## Les spires s'ecartent quand il s'etire et se pincent lateralement. Le ballant
+## est un arc perpendiculaire a l'axe, nourri par la composante laterale de la
+## vitesse — un ressort qui balance n'est pas droit.
 func _dessiner_ressort() -> void:
-	var etirement: float = _longueur / maxf(Reglages.LONGUEUR_REPOS, 1.0)
+	var axe: Vector2 = _extremite - ANCRE
+	var longueur: float = maxf(axe.length(), 0.001)
+	var direction: Vector2 = axe / longueur
+	var normale: Vector2 = direction.orthogonal()
+
+	var etirement: float = longueur / maxf(Reglages.LONGUEUR_REPOS, 1.0)
 	var largeur: float = Reglages.LARGEUR_SPIRE / sqrt(maxf(etirement, 0.35))
-	var ballant: float = clampf(_vitesse * Reglages.BALLANT, -26.0, 26.0)
+	var v_laterale: float = _vitesse.dot(normale)
+	var ballant: float = clampf(v_laterale * Reglages.BALLANT, -26.0, 26.0)
 
 	var points: PackedVector2Array = PackedVector2Array()
 	points.append(ANCRE)
@@ -399,9 +564,9 @@ func _dessiner_ressort() -> void:
 		var cote: float = largeur * (1.0 if i % 2 == 0 else -1.0)
 		# Arc de ballant : nul aux deux extremites, maximal au milieu.
 		points.append(
-			Vector2(ANCRE.x + cote + ballant * sin(PI * t), ANCRE.y + _longueur * t)
+			ANCRE + direction * (longueur * t) + normale * (cote + ballant * sin(PI * t))
 		)
-	points.append(ANCRE + Vector2(ballant * 0.35, _longueur))
+	points.append(_extremite)
 	draw_polyline(points, RESSORT, 2.0)
 
 
@@ -411,7 +576,6 @@ func _dessiner_butee() -> void:
 	draw_circle(pivot, 6.0, FOND)
 	draw_arc(pivot, 6.0, 0.0, TAU, 16, TRAIT, 2.0)
 	draw_line(pivot, pivot + bras, PRETE if _butee else TRAIT_EFFACE, 3.0)
-	# Le patin, au bout du bras.
 	var normale: Vector2 = bras.orthogonal().normalized() * 11.0
 	draw_line(pivot + bras - normale, pivot + bras + normale, PRETE if _butee else TRAIT_EFFACE, 4.0)
 
@@ -423,25 +587,13 @@ func _dessiner_aimantation() -> void:
 		draw_dashed_line(_saisie.call("point_accroche"), _point_aimant, PRETE, 1.0, 6.0)
 
 
-func _dessiner_regle() -> void:
-	var rect: Rect2 = _rect_regle()
-	draw_rect(rect, FOND, true)
-	draw_rect(rect, TRAIT_EFFACE, false, 1.5)
-	var millimetres: int = int(rect.size.y / 4.0)
-	for i: int in millimetres + 1:
-		var y: float = rect.position.y + float(i) * 4.0
-		var longue: bool = i % 10 == 0
-		draw_line(
-			Vector2(rect.position.x, y),
-			Vector2(rect.position.x + (18.0 if longue else 8.0), y),
-			TRAIT_EFFACE if longue else TRAIT_TRES_EFFACE,
-			1.0
-		)
-
-
-func _rect_regle() -> Rect2:
-	return Rect2(_regle, Vector2(34.0, 420.0))
-
-
 func _pivot_butee() -> Vector2:
 	return ANCRE + Vector2(-104.0, 60.0)
+
+
+func _input(evenement: InputEvent) -> void:
+	# La butee se clique directement, c'est un objet et pas un bouton d'interface.
+	if evenement is InputEventMouseButton and evenement.pressed and evenement.button_index == MOUSE_BUTTON_LEFT:
+		if get_global_mouse_position().distance_to(_pivot_butee()) < 26.0:
+			_butee = not _butee
+			get_viewport().set_input_as_handled()
