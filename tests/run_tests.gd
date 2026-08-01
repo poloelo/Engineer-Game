@@ -12,7 +12,20 @@ const PREFIXE_FICHIER: String = "test_"
 const PREFIXE_METHODE: String = "test_"
 
 
-func _initialize() -> void:
+var _execute: bool = false
+
+
+## Les suites tournent a la premiere frame et non dans _initialize : l'arbre n'y
+## est pas encore vivant, et une scene ajoutee a la racine n'y recevrait jamais
+## son _ready.
+func _process(_delta: float) -> bool:
+	if not _execute:
+		_execute = true
+		_executer()
+	return true
+
+
+func _executer() -> void:
 	var chemins: PackedStringArray = _lister_suites()
 	if chemins.is_empty():
 		print("Aucune suite de test trouvee dans %s" % DOSSIER)

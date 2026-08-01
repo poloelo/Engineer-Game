@@ -70,6 +70,7 @@ func test_cadrage_impose_prime() -> void:
 
 func test_projection_respecte_le_sens_de_l_ecran() -> void:
 	var graphe: Graphe = _graphe()
+	graphe.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	graphe.size = Vector2(400.0, 300.0)
 	var cadre: Rect2 = graphe.call("_cadre")
 	var bornes: Rect2 = Rect2(0.0, 0.0, 100.0, 100.0)
@@ -90,4 +91,26 @@ func test_etiquettes_sans_decimales_parasites() -> void:
 	verifier_egal(graphe.call("_formater", 250.0, 50.0), "250", "pas entier, etiquette entiere")
 	verifier_egal(graphe.call("_formater", 0.5, 0.1), "0.5", "pas decimal, une decimale")
 	verifier_egal(graphe.call("_formater", -0.0, 1.0), "0", "pas de zero negatif")
+	graphe.free()
+
+
+func test_decoupe_au_cadre() -> void:
+	# Un modele tres faux sort du cadre. Le trace doit s'arreter au bord, sinon
+	# il se dessine par-dessus les graduations et le reste de l'ecran.
+	var graphe: Graphe = _graphe()
+	var cadre: Rect2 = Rect2(0.0, 0.0, 100.0, 100.0)
+
+	var dedans: PackedVector2Array = graphe.call("_decouper", Vector2(10, 10), Vector2(90, 90), cadre)
+	verifier_egal(dedans.size(), 2, "un segment interieur est conserve")
+	verifier_proche(dedans[0].x, 10.0, "sans etre rogne")
+
+	var sortant: PackedVector2Array = graphe.call("_decouper", Vector2(50, 50), Vector2(50, 400), cadre)
+	verifier_egal(sortant.size(), 2, "un segment sortant est coupe")
+	verifier_proche(sortant[1].y, 100.0, "coupe pile au bord")
+
+	var dehors: PackedVector2Array = graphe.call("_decouper", Vector2(200, 200), Vector2(300, 300), cadre)
+	verifier_egal(dehors.size(), 0, "un segment entierement dehors n'est pas trace")
+
+	var parallele: PackedVector2Array = graphe.call("_decouper", Vector2(-10, 300), Vector2(200, 300), cadre)
+	verifier_egal(parallele.size(), 0, "une horizontale hors cadre non plus")
 	graphe.free()

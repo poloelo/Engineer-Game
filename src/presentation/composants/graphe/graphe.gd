@@ -193,16 +193,24 @@ func _dessiner_courbe(
 	var precedent: Vector2 = _vers_pixel(courbe[0], cadre, bornes)
 	for i: int in range(1, courbe.size()):
 		var courant: Vector2 = _vers_pixel(courbe[i], cadre, bornes)
-		if pointille:
-			draw_dashed_line(precedent, courant, couleur, epaisseur, ThemeBlueprint.LONGUEUR_TIRET)
-		else:
-			draw_line(precedent, courant, couleur, epaisseur)
+		# Un modele tres faux sort du cadre : le decouper, sinon il se dessine
+		# par-dessus les graduations et le reste de l'ecran.
+		var segment: PackedVector2Array = _decouper(precedent, courant, cadre)
+		if segment.size() == 2:
+			if pointille:
+				draw_dashed_line(
+					segment[0], segment[1], couleur, epaisseur, ThemeBlueprint.LONGUEUR_TIRET
+				)
+			else:
+				draw_line(segment[0], segment[1], couleur, epaisseur)
 		precedent = courant
 
 
 func _dessiner_releves(cadre: Rect2, bornes: Rect2) -> void:
 	for point: Vector2 in _releves:
 		var pixel: Vector2 = _vers_pixel(point, cadre, bornes)
+		if not cadre.has_point(pixel):
+			continue
 		draw_circle(pixel, ThemeBlueprint.RAYON_POINT, ThemeBlueprint.FOND)
 		draw_arc(
 			pixel,
@@ -288,6 +296,41 @@ func _vers_pixel(point: Vector2, cadre: Rect2, bornes: Rect2) -> Vector2:
 	var v: float = (point.y - bornes.position.y) / bornes.size.y
 	# L'axe des ordonnees pointe vers le haut a l'ecran, l'inverse du pixel.
 	return Vector2(cadre.position.x + u * cadre.size.x, cadre.end.y - v * cadre.size.y)
+
+
+## Decoupe un segment au rectangle de trace (Liang-Barsky). Rend un tableau vide
+## quand le segment est entierement dehors.
+func _decouper(a: Vector2, b: Vector2, cadre: Rect2) -> PackedVector2Array:
+	var direction: Vector2 = b - a
+	var debut: float = 0.0
+	var fin: float = 1.0
+	var bords: PackedFloat32Array = PackedFloat32Array(
+		[-direction.x, direction.x, -direction.y, direction.y]
+	)
+	var distances: PackedFloat32Array = PackedFloat32Array(
+		[
+			a.x - cadre.position.x,
+			cadre.end.x - a.x,
+			a.y - cadre.position.y,
+			cadre.end.y - a.y,
+		]
+	)
+
+	for i: int in 4:
+		if is_zero_approx(bords[i]):
+			# Segment parallele a ce bord : soit entierement dedans, soit dehors.
+			if distances[i] < 0.0:
+				return PackedVector2Array()
+			continue
+		var ratio: float = distances[i] / bords[i]
+		if bords[i] < 0.0:
+			debut = maxf(debut, ratio)
+		else:
+			fin = minf(fin, ratio)
+
+	if debut > fin:
+		return PackedVector2Array()
+	return PackedVector2Array([a + direction * debut, a + direction * fin])
 
 
 ## Pas de graduation lisible : 1, 2 ou 5 fois une puissance de dix.

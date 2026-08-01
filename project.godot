@@ -6,6 +6,7 @@ config_version=5
 
 config/name="Le Jeu de l'Ingenieur"
 config/description="Un ingenieur devant un plan technique. Observer, mesurer, specifier."
+run/main_scene="res://src/presentation/machines/peson/peson.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 
 [debug]

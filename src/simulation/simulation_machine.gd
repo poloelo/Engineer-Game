@@ -134,6 +134,26 @@ func soumettre_specification(specification: Specification) -> ResultatBanc:
 	return resultat
 
 
+## Plage de lectures que la machine peut produire avec ses valeurs de reference.
+## Sert a figer les axes du graphe : le cadrage n'est pas un secret, et un graphe
+## qui saute a chaque releve est illisible.
+func plage_lecture() -> Vector2:
+	var emplacement: EmplacementPiece = _emplacement_principal()
+	if emplacement == null or machine.etalons.is_empty():
+		return Vector2.ZERO
+	var mini: float = INF
+	var maxi: float = -INF
+	for etalon: float in machine.etalons:
+		var lecture: float = _valeur(
+			_etat_complet(etat_pour_etalon(etalon)), emplacement.grandeur_lue
+		)
+		if is_nan(lecture):
+			continue
+		mini = minf(mini, lecture)
+		maxi = maxf(maxi, lecture)
+	return Vector2.ZERO if is_inf(mini) else Vector2(mini, maxi)
+
+
 ## Trace continu du modele du joueur, pour le superposer aux releves du graphe.
 func courbe_predite(specification: Specification, x_min: float, x_max: float, points: int = 64) -> PackedVector2Array:
 	var courbe: PackedVector2Array = PackedVector2Array()
