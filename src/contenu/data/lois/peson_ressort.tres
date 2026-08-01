@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="Loi" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/contenu/loi.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"peson_ressort"
+nom_physique = "Hooke"
+forme = 0
+grandeurs_entree = Array[StringName]([&"masse"])
+grandeurs_sortie = Array[StringName]([&"longueur"])
+parametres = Array[String](["l0", "sensibilite", "masse_crochet"])
+parametres_defaut = {
+"l0": 60.0,
+"masse_crochet": 8.0,
+"sensibilite": 0.18
+}
+expression = "l0 + (masse + masse_crochet) * sensibilite"
+expression_inverse = "(longueur - l0) / sensibilite - masse_crochet"
+invertibilite = 0
+outils_requis = Array[StringName]([&"voir", &"peser"])

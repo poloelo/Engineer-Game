@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="Loi" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/contenu/loi.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"hooke"
+nom_physique = "Hooke"
+forme = 0
+grandeurs_entree = Array[StringName]([&"force"])
+grandeurs_sortie = Array[StringName]([&"longueur"])
+parametres = Array[String](["l0", "k"])
+parametres_defaut = {
+"k": 0.5,
+"l0": 60.0
+}
+expression = "l0 + force / k"
+expression_inverse = "(longueur - l0) * k"
+invertibilite = 0
+outils_requis = Array[StringName]([&"voir"])
