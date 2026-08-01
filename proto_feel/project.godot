@@ -1,0 +1,23 @@
+; Prototype de feel — projet autonome, jetable, aucune dependance a src/
+
+config_version=5
+
+[application]
+
+config/name="Proto Feel - ressort"
+run/main_scene="res://atelier.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[physics]
+
+2d/default_gravity=980.0
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

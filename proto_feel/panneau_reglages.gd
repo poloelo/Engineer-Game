@@ -1,0 +1,98 @@
+# Panneau de reglage a chaud. Tab pour l'ouvrir et le fermer.
+#
+# Des curseurs, oui : c'est un outil de reglage, pas une mecanique de jeu. Regler
+# a chaud est la seule facon d'affiner un feel — sinon on relance trente fois et
+# on n'ajuste jamais vraiment.
+extends CanvasLayer
+
+const Reglages: GDScript = preload("res://reglages.gd")
+
+
+func _ready() -> void:
+	layer = 10
+	var fond: PanelContainer = PanelContainer.new()
+	fond.position = Vector2(14.0, 14.0)
+	fond.custom_minimum_size.x = 330.0
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.03, 0.09, 0.16, 0.92)
+	style.border_color = Color(1.0, 1.0, 1.0, 0.16)
+	style.set_border_width_all(1)
+	style.set_content_margin_all(10)
+	fond.add_theme_stylebox_override("panel", style)
+	add_child(fond)
+
+	var colonne: VBoxContainer = VBoxContainer.new()
+	colonne.add_theme_constant_override("separation", 2)
+	fond.add_child(colonne)
+
+	for ligne: Array in _lignes():
+		colonne.add_child(_curseur(ligne[0], ligne[1], ligne[2], ligne[3]))
+
+	var aide: Label = Label.new()
+	aide.text = "Tab : masquer   ·   R : ranger les masses"
+	aide.add_theme_font_size_override("font_size", 11)
+	aide.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.4))
+	colonne.add_child(aide)
+
+	visible = false
+
+
+func _input(evenement: InputEvent) -> void:
+	if evenement is InputEventKey and evenement.pressed and evenement.keycode == KEY_TAB:
+		visible = not visible
+		get_viewport().set_input_as_handled()
+
+
+## Nom de la propriete dans reglages.gd, libelle, minimum, maximum.
+##
+## Les statiques se lisent et s'ecrivent par set()/get() sur l'objet script :
+## pas besoin d'une paire de Callables par ligne.
+func _lignes() -> Array:
+	return [
+		["RAIDEUR", "Raideur ressort", 5.0, 90.0],
+		["AMORTISSEMENT", "Amortissement", 0.0, 14.0],
+		["LONGUEUR_REPOS", "Longueur au repos", 40.0, 200.0],
+		["GRAVITE", "Gravite", 300.0, 3000.0],
+		["RAIDEUR_CURSEUR", "Rappel curseur", 80.0, 1600.0],
+		["AMORTISSEMENT_CURSEUR", "Amortissement curseur", 5.0, 90.0],
+		["COMPENSATION_POIDS", "Compensation du poids", 0.0, 1.0],
+		["RAYON_AIMANTATION", "Rayon d'aimantation", 15.0, 160.0],
+		["FORCE_AIMANTATION", "Force d'aimantation", 0.0, 3000.0],
+		["AMPLITUDE_SURSAUT", "Sursaut d'accrochage", 0.0, 900.0],
+		["SEUIL_DECROCHAGE", "Seuil de decrochage", 30.0, 320.0],
+		["TRANSMISSION_CHOC", "Transmission du choc", 0.0, 2.0],
+		["REBOND", "Rebond", 0.0, 0.9],
+		["FRICTION", "Friction", 0.0, 2.0],
+		["FREIN_ROULEMENT", "Frein de roulement", 0.0, 8.0],
+		["AMORTISSEMENT_BUTEE", "Amortissement butee", 5.0, 60.0],
+		["BALLANT", "Ballant du ressort", 0.0, 0.3],
+		["LARGEUR_SPIRE", "Largeur des spires", 4.0, 40.0],
+	]
+
+
+func _curseur(propriete: String, libelle: String, mini: float, maxi: float) -> Control:
+	var ligne: VBoxContainer = VBoxContainer.new()
+	ligne.add_theme_constant_override("separation", 0)
+
+	var texte: Label = Label.new()
+	texte.add_theme_font_size_override("font_size", 11)
+	texte.add_theme_color_override("font_color", Color(0.9, 0.94, 0.97, 0.75))
+	ligne.add_child(texte)
+
+	var curseur: HSlider = HSlider.new()
+	curseur.min_value = mini
+	curseur.max_value = maxi
+	curseur.step = (maxi - mini) / 400.0
+	curseur.value = float(Reglages.get(propriete))
+	curseur.custom_minimum_size.y = 14.0
+	ligne.add_child(curseur)
+
+	var rafraichir: Callable = func(valeur: float) -> void:
+		texte.text = "%s   %s" % [libelle, String.num(valeur, 2)]
+	rafraichir.call(curseur.value)
+	curseur.value_changed.connect(
+		func(valeur: float) -> void:
+			Reglages.set(propriete, valeur)
+			rafraichir.call(valeur)
+	)
+	return ligne
