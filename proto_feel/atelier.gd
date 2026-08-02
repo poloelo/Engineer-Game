@@ -17,6 +17,7 @@ const Masse: GDScript = preload("res://masse.gd")
 const Feuille: GDScript = preload("res://feuille.gd")
 const Stylo: GDScript = preload("res://stylo.gd")
 const Regle: GDScript = preload("res://regle.gd")
+const Loupe: GDScript = preload("res://loupe.gd")
 const PanneauReglages: GDScript = preload("res://panneau_reglages.gd")
 
 const FOND: Color = Color("0d243d")
@@ -49,6 +50,7 @@ var _directions: Array[Vector2] = []
 var _feuille: Node2D = null
 var _stylo: Node2D = null
 var _regle: Node2D = null
+var _loupe: Node2D = null
 
 # --- Saisie ------------------------------------------------------------------
 
@@ -60,7 +62,6 @@ var _point_aimant: Vector2 = Vector2.ZERO
 var _aimant_actif: bool = false
 ## Ce que le curseur traine qui n'est pas une masse : la feuille, le stylo, la regle.
 var _outil_saisi: Node2D = null
-var _mode_rotation: bool = false
 var _clipsage_vise: RigidBody2D = null
 
 
@@ -121,6 +122,11 @@ func _construire_instruments() -> void:
 	_stylo.position = Vector2(1060.0, SOL - 30.0)
 	_stylo.z_index = 7
 	add_child(_stylo)
+
+	_loupe = Loupe.new()
+	_loupe.position = Vector2(1010.0, 300.0)
+	_loupe.z_index = 12
+	add_child(_loupe)
 
 
 func _construire_crochet() -> void:
@@ -201,7 +207,12 @@ func _integrer_ressort(delta: float) -> void:
 		var force: Vector2 = (
 			-direction * Reglages.RAIDEUR * (longueur - Reglages.LONGUEUR_REPOS)
 			+ Vector2.DOWN * _masse_chaine() * Reglages.GRAVITE
-			- (v_axiale * axial + v_laterale * lateral) * masse
+			# L'axial est normalise en racine de la masse : sans cela le taux
+			# d'amortissement croit avec la charge, et le meme reglage donne un
+			# retour claquant a vide et sirupeux en charge. Le lateral garde sa
+			# normalisation d'origine, son reglage etant valide tel quel.
+			- v_axiale * axial * sqrt(masse)
+			- v_laterale * lateral * masse
 		)
 		_vitesse += (force / masse) * pas
 		_extremite += _vitesse * pas
@@ -221,11 +232,21 @@ func _contraindre_longueur() -> void:
 
 ## Sans ce seuil le ressort fremit indefiniment, ce qui est insupportable quand
 ## on essaie de lire une position au millimetre.
+##
+## Le critere porte sur l'amplitude restante de l'oscillation, ecart et vitesse
+## combines, et non sur les deux pris separement : un ressort qui passe vite par
+## sa position d'equilibre n'est pas au repos, et un ressort momentanement arrete
+## au sommet de sa course non plus. Exiger les deux petits au meme instant
+## retardait l'endormissement de plus d'une seconde, et c'est ce qui donnait
+## l'impression de sirop bien plus que l'amortissement lui-meme.
 func _endormir() -> void:
-	if _vitesse.length() > Reglages.SEUIL_REPOS:
-		return
 	var repos: Vector2 = ANCRE + Vector2.DOWN * _longueur_equilibre()
-	if _extremite.distance_to(repos) > Reglages.SEUIL_REPOS:
+	var masse: float = Reglages.MASSE_RESSORT + _masse_chaine()
+	var pulsation: float = sqrt(maxf(Reglages.RAIDEUR, 1.0) / maxf(masse, 0.01))
+	var amplitude: float = Vector2(
+		_extremite.distance_to(repos), _vitesse.length() / pulsation
+	).length()
+	if amplitude > Reglages.SEUIL_REPOS:
 		return
 	_extremite = repos
 	_vitesse = Vector2.ZERO
@@ -419,9 +440,13 @@ func _unhandled_input(evenement: InputEvent) -> void:
 
 func _saisir(ou: Vector2) -> void:
 	# Ordre de priorite : les instruments sont devant, la feuille est le fond.
+	if _loupe.attraper(ou):
+		_outil_saisi = _loupe
+		_offset_saisie = ou - _loupe.global_position
+		return
+
 	if _regle.attraper(ou):
 		_outil_saisi = _regle
-		_mode_rotation = _regle.en_rotation
 		_offset_saisie = ou - _regle.global_position
 		return
 
@@ -493,10 +518,15 @@ func _ranger() -> void:
 func _process(_delta: float) -> void:
 	var ou: Vector2 = get_global_mouse_position()
 	if _outil_saisi == _regle:
-		if _mode_rotation:
-			_regle.pivoter_vers(ou)
+		if _regle.prise == Regle.Prise.TRANSLATION:
+			# On aimante le zero : c'est lui qu'on cale sur un repere.
+			var vise: Vector2 = ou - _offset_saisie
+			_regle.deplacer(vise, _feuille.encre_proche(vise, Reglages.AIMANT_REGLE))
 		else:
-			_regle.global_position = ou - _offset_saisie
+			# En pivot, c'est le bout tenu qui cherche une marque.
+			_regle.pivoter(ou, _feuille.encre_proche(ou, Reglages.AIMANT_REGLE))
+	elif _outil_saisi == _loupe:
+		_loupe.global_position = ou - _offset_saisie
 	elif _outil_saisi == _feuille:
 		_feuille.global_position = ou - _offset_saisie
 	elif _outil_saisi == _stylo:
@@ -504,7 +534,8 @@ func _process(_delta: float) -> void:
 		_clipsage_vise = _cible_de_clipsage(ou)
 		_stylo.vise = _clipsage_vise != null
 
-	_regle.definir_curseur(ou)
+	_regle.definir_survol(ou)
+	_loupe.definir_survol(ou)
 
 
 ## Element mobile le plus proche du pointeur, dans le rayon de clipsage.

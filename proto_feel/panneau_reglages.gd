@@ -49,11 +49,11 @@ func _input(evenement: InputEvent) -> void:
 ## pas besoin d'une paire de Callables par ligne.
 func _lignes() -> Array:
 	return [
-		["RAIDEUR", "Raideur ressort", 5.0, 90.0],
-		["AMORTISSEMENT", "Amortissement axial", 0.0, 14.0],
+		["RAIDEUR", "Raideur ressort", 10.0, 200.0],
+		["AMORTISSEMENT", "Amortissement axial", 0.0, 20.0],
 		["AMORTISSEMENT_LATERAL", "Amortissement lateral", 0.0, 14.0],
 		["LONGUEUR_REPOS", "Longueur au repos", 40.0, 200.0],
-		["GRAVITE", "Gravite", 300.0, 3000.0],
+		["GRAVITE", "Gravite", 500.0, 8000.0],
 		["RAIDEUR_CURSEUR", "Rappel curseur", 80.0, 1600.0],
 		["AMORTISSEMENT_CURSEUR", "Amortissement curseur", 5.0, 90.0],
 		["COMPENSATION_POIDS", "Compensation du poids", 0.0, 1.0],
@@ -73,7 +73,6 @@ func _lignes() -> Array:
 		["RAYON_CLIPSAGE", "Rayon de clipsage", 15.0, 130.0],
 		["PAS_TRACE", "Finesse de la trace", 0.5, 10.0],
 		["AIMANT_REGLE", "Aimant de la regle", 5.0, 70.0],
-		["DISTANCE_LOUPE", "Distance de la loupe", 20.0, 220.0],
 		["RAYON_LOUPE", "Rayon de la loupe", 30.0, 160.0],
 		["GROSSISSEMENT_LOUPE", "Grossissement", 1.5, 7.0],
 	]

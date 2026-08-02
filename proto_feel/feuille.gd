@@ -70,6 +70,24 @@ func lever() -> void:
 	queue_redraw()
 
 
+## Point d'encre le plus proche, en monde, ou Vector2.INF si aucun dans le rayon.
+## C'est ce qui permet a la regle de se caler sur une marque sans viser au pixel.
+##
+## Balayage lineaire de toute la face : suffisant pour un prototype, a revoir si
+## les traces deviennent tres longues.
+func encre_proche(monde: Vector2, rayon: float) -> Vector2:
+	var local: Vector2 = to_local(monde)
+	var meilleure: Vector2 = Vector2.INF
+	var distance: float = rayon
+	for trace: PackedVector2Array in _faces[_face] + [_trace_en_cours]:
+		for point: Vector2 in trace:
+			var ecart: float = local.distance_to(point)
+			if ecart < distance:
+				distance = ecart
+				meilleure = point
+	return Vector2.INF if meilleure == Vector2.INF else to_global(meilleure)
+
+
 func retourner() -> void:
 	lever()
 	_face = 1 - _face

@@ -13,10 +13,13 @@ extends RefCounted
 static var LONGUEUR_REPOS: float = 95.0
 
 ## Raideur. Plus c'est haut, moins ca s'allonge et plus ca oscille vite.
-static var RAIDEUR: float = 26.0
+static var RAIDEUR: float = 70.0
 
 ## Amortissement le long de l'axe du ressort : c'est lui qui calme le yoyo.
-static var AMORTISSEMENT: float = 2.4
+## Applique en racine de la masse, pour que le taux d'amortissement ne depende
+## pas de la charge — sans quoi une masse lourde revient dans du sirop et une
+## masse legere claque, avec le meme reglage.
+static var AMORTISSEMENT: float = 5.2
 
 ## Amortissement perpendiculaire a l'axe : c'est lui qui calme le balancement.
 ## Separe de l'axial exprès — un ressort qui rebondit court mais balance
@@ -27,15 +30,15 @@ static var AMORTISSEMENT_LATERAL: float = 1.5
 static var AMORTISSEMENT_BUTEE: float = 26.0
 
 ## Masse propre du ressort. Evite qu'il devienne infiniment nerveux a vide.
-static var MASSE_RESSORT: float = 0.35
+static var MASSE_RESSORT: float = 0.18
 
 ## Gravite appliquee au ressort ET aux masses libres.
-static var GRAVITE: float = 1500.0
+static var GRAVITE: float = 3200.0
 
-## En dessous de cette vitesse et de cet ecart a l'equilibre, le ressort se pose
-## franchement. Sans ce seuil il fremit indefiniment, ce qui est insupportable
-## quand on essaie de lire une position.
-static var SEUIL_REPOS: float = 3.0
+## Amplitude d'oscillation restante, en pixels, en dessous de laquelle le ressort
+## se pose franchement. Sans ce seuil il fremit indefiniment, ce qui est
+## insupportable quand on essaie de lire une position.
+static var SEUIL_REPOS: float = 4.0
 
 ## Retard angulaire d'un maillon sur le precedent. C'est le flottement entre deux
 ## masses empilees. A 1.0 la chaine est rigide.
@@ -53,7 +56,7 @@ static var AMORTISSEMENT_CURSEUR: float = 34.0
 
 ## Part du poids compensee pendant qu'on traine. A 1.0 l'objet ne pese plus rien
 ## au curseur ; a 0.0 il pend franchement sous le pointeur.
-static var COMPENSATION_POIDS: float = 0.55
+static var COMPENSATION_POIDS: float = 0.75
 
 # --- Accrochage --------------------------------------------------------------
 
@@ -93,12 +96,9 @@ static var RAYON_CLIPSAGE: float = 46.0
 ## Bas = trace tres fine mais lourde, haut = trace anguleuse.
 static var PAS_TRACE: float = 1.6
 
-## Distance au bord de la regle en dessous de laquelle le curseur s'aimante sur
-## la graduation la plus proche.
-static var AIMANT_REGLE: float = 26.0
-
-## Distance a la regle a partir de laquelle la loupe apparait.
-static var DISTANCE_LOUPE: float = 90.0
+## Distance en dessous de laquelle la regle se cale d'elle-meme sur un trait de
+## stylo. Legere : elle aide a poser le zero sur une marque, elle ne colle pas.
+static var AIMANT_REGLE: float = 22.0
 
 ## Rayon de la loupe, en pixels a l'ecran.
 static var RAYON_LOUPE: float = 78.0
