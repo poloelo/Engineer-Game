@@ -1,165 +1,261 @@
-# Le Jeu de l'Ingénieur
+# Le Jeu de l'Ingénieur — Document de référence
 
-Un jeu d'instruments. On ne répond pas à des questions : **on fabrique ses propres mesures**,
-à la main, avec ce qu'on a sur l'établi.
-
-Le joueur reçoit une commande. Ses instruments sont trop grossiers pour l'honorer. Il en
-construit un meilleur — un ressort, un crochet, des masses étalons, un stylo, une feuille,
-une règle — puis il s'en sert.
-
-Aucun QCM, aucune note, aucune étoile, aucun verdict. Rien ne vérifie ce qui sort de
-l'atelier. Le seul texte du jeu est le bon de travail ; les seuls chiffres sont gravés sur
-la règle et écrits sur ce bon.
-
-Godot 4.7.1 · GDScript typé · tout est dessiné dans `_draw`, les textures sont optionnelles.
+Ce document est la source de vérité du design. **À lire avant toute décision d'implémentation,
+et à relire en cas de doute.** Si un choix technique contredit ce document, c'est le choix
+technique qui a tort — ou alors ce document doit être modifié explicitement, par moi.
 
 ---
 
-## Lancer
+## 1. Le jeu en une phrase
 
-```sh
-godot --path .        # ou ouvrir le projet dans l'éditeur
-```
+Un jeu d'instruments : on répare des machines en mesurant l'invisible avec des outils qu'on
+fabrique soi-même, et les mathématiques n'y sont jamais un exercice — elles sont ce que font
+les outils.
 
-La scène principale est `src/atelier/atelier.tscn` — c'est le niveau 1, et pour l'instant
-tout le jeu.
+## 2. Ce que le joueur fait réellement
 
-| Geste | Comment |
-|---|---|
-| prendre, poser, accrocher | clic gauche maintenu |
-| baisser / lever la pointe du stylo | espace, ou clic droit |
-| clipser le stylo sur une masse | le lâcher à côté d'elle |
-| faire pivoter la règle | l'attraper par un bout au lieu du corps |
-| incliner le pot de poudre | l'attraper par sa poignée, en haut |
-| ranger les masses · retourner la feuille | `R` · `F` |
-| effacer la face · feuille vierge · exporter en PNG | `P` · `N` · `E` |
-| régler la physique à chaud | `Tab` |
+Devant un plan d'ingénieur bleu et blanc, une machine est cassée. On lui donne un **énoncé de
+commande** (« trois sachets : 56, 89 et 143 g ») et une **caisse à outils**. Rien d'autre.
 
-## Tester
+Il monte des objets sur le plan, il mesure, il trace sur du papier, il pose une règle sur ses
+traces, et il produit ce qu'on lui a demandé. Il repart avec un instrument de plus.
 
-```sh
-tests/run.sh                       # utilise le binaire `godot` du PATH
-GODOT=/chemin/vers/godot tests/run.sh
-```
+**Le but n'est jamais « trouve la loi ». Le but est toujours un objectif physique concret que
+la loi permet d'atteindre.** C'est la différence entre un jeu et un devoir, et c'est la règle
+la plus importante de ce document.
 
-Le runner est headless, sans dépendance externe, et rend un code de sortie non nul en cas
-d'échec.
+## 3. La doctrine du fun
 
-```
-OK — 14 tests, 36 verifications, 0 echec
-```
+### Le fun d'abord, la rigueur ensuite
 
-Les tests portent sur le **contenu** (lois, grandeurs, formes) et sur la **physique d'une
-machine**. L'atelier lui-même n'est pas testé : c'est de la manipulation, ça se juge à la
-main.
+À chaque arbitrage entre réalisme physique et plaisir de manipulation, **choisir le plaisir**.
+Un ressort qui s'allonge de 0,18 mm/g est réaliste et invisible. Exagérer est autorisé et
+souvent souhaitable. Personne ne joue pour la fidélité d'un module d'Young.
 
----
+### Le geste avant l'interface
 
-## Le niveau 1
+Tout ce qui peut être un objet manipulable doit être un objet manipulable.
 
-> Trois sachets de poudre : 56 g, 89 g, 143 g.
+- Figer la règle → une punaise qu'on plante, pas une case à cocher
+- Arrêter les oscillations → une butée qu'on rabat, pas un bouton
+- Faire pivoter → attraper une extrémité, pas cliquer sur une icône
+- Choisir une valeur → positionner un objet, pas bouger un curseur
 
-La balance de l'atelier a un pas de 100 g. Elle ne bouge pas. Le kit contient un ressort,
-un crochet, quatre masses étalons (20, 50, 100, 150 g), un stylo, une feuille, une règle et
-une loupe.
+**Un curseur invite à balayer au hasard. Un objet à placer invite à comprendre pourquoi il va
+là.**
 
-Le parcours attendu, que rien n'impose et que rien ne guide :
+### Rien ne s'arrête net
 
-1. clipser le stylo au crochet, pointe baissée ;
-2. accrocher un étalon — le ressort descend, le stylo marque le papier ;
-3. recommencer avec les autres étalons, en décalant la feuille entre deux ;
-4. poser la règle sur les marques, constater qu'elles sont **régulièrement espacées**,
-   subdiviser à la main pour fabriquer les graduations manquantes ;
-5. pendre un sachet vide, incliner le pot, et verser jusqu'à sa propre marque.
+Tout a de l'inertie, tout dépasse, tout revient, tout s'amortit. Une masse lâchée rebondit et
+roule. Un ressort déchargé dépasse et se calme. Le poids se ressent au curseur : une masse
+lourde accuse un retard sur le pointeur, une légère y colle.
 
-Le livrable du niveau n'est pas une équation. C'est **un cadran gradué à la main et trois
-sachets produits**.
+C'est ce qui fait qu'on manipule pendant deux minutes sans objectif. Si ce plaisir-là
+disparaît, plus rien ne tient.
 
-**Deux pièges, et ce sont les mêmes.** Le crochet pèse 8 g et le sachet vide 12 g. Ils
-étirent déjà le ressort avant qu'on ait rien accroché : le zéro du joueur n'est pas là où
-il croit. Le crochet se dévisse — c'est le geste qui fait comprendre d'où vient l'écart.
+### Le test permanent
 
-Les quatre paliers, mesurés à l'arrêt : **85,81 · 116,47 · 167,56 · 218,65 mm**, soit
-1,0219 mm/g d'un bout à l'autre. C'est cette régularité qui autorise la subdivision, et
-aucune combinaison d'étalons ne tombe sur 56, 89 ni 143.
+> **Est-ce qu'on continue à jouer avec après avoir vérifié que ça marche ?**
 
----
+Si on ferme la fenêtre dès que la fonctionnalité est validée, elle est ratée, quelle que soit
+sa correction technique.
 
-## Comment c'est fait
+## 4. La doctrine pédagogique
 
-### Le monde est en millimètres
+### Rien n'est enseigné, tout est rencontré
 
-Toute la simulation est en **mm, g, s** — forces en g·mm/s². La gravité vaut 9,81 m/s² et
-n'est pas réglable. Une seule constante, `unites.gd : PIXELS_PAR_MM`, relie le monde à
-l'écran, et elle ne sert qu'au zoom de la `Camera2D`.
+Aucun cours, aucune définition, aucun encadré explicatif, aucun pop-up « le savais-tu »,
+aucun tutoriel textuel.
 
-Conséquence recherchée : **une graduation gravée à 10 mm couvre réellement 10 mm de monde.**
-Pour un jeu dont le sujet est la mesure, l'instrument ne peut pas mentir. Le jeu tourne à
-l'identique en 1152 × 648 et en 4K — la résolution est un problème de caméra, jamais de
-physique.
+Une balance qui refuse de descendre sous 100 g **est** le tutoriel du niveau 1.
 
-### Physique hybride
+### Les maths émergent de la réutilisation
 
-Les masses libres sont des `RigidBody2D` : chute, rebond, empilement, roulement, le moteur
-le fait mieux et gratuitement. **Le ressort est intégré à la main**, et il le reste : un
-`DampedSpringJoint2D` donnerait un pendule mou impossible à régler, alors que deux
-constantes lisibles se règlent en dix secondes (`Tab`).
+Le contenu pédagogique n'est pas la loi physique, c'est la **forme mathématique** qui
+réapparaît dans des contextes sans rapport. Un ressort, un fil électrique, une bouilloire et
+un robinet sont quatre choses différentes et une seule forme linéaire.
 
-Le ressort est libre dans le plan. Sa force s'applique le long de son axe courant, la
-gravité reste verticale ; le balancement n'est écrit nulle part, il tombe de la combinaison
-des deux.
+Règle ferme : **une forme doit revenir au moins trois fois dans trois contextes physiquement
+différents.** Deux occurrences, c'est une coïncidence. Trois, c'est une loi. Une forme vue une
+seule fois est décorative et doit être coupée.
 
-### Deux couches par objet
+### La linéarité se vit, elle ne s'énonce pas
 
-Chaque objet est coupé en une **forme** (collision, masse, points d'attache — elle ne change
-jamais) et un **visuel** enfant remplaçable, qui prend une texture si elle existe et retombe
-sur le dessin procédural sinon. Déposer `textures/masse_50g.png` suffit — voir
-`textures/LISEZMOI.md`.
+Le joueur ne lit jamais « y = ax + b ». Il constate que **des masses égales font des écarts
+égaux** sur son papier, et il en déduit qu'il peut subdiviser pour fabriquer les graduations
+manquantes. C'est la même chose, et c'est vécu.
 
-Les points d'attache sont des `Marker2D` nommés (`crochet`, `pointe`, `bord_zero`,
-`goulot`, `bouche`), cherchés par genre et par rayon. Aucune position n'est écrite en dur
-dans la logique de clipsage.
+### L'algèbre n'est jamais requise, elle est plus rapide
 
-### La loupe et l'encre sont des `SubViewport`
+C'est le seul mécanisme d'apprentissage qui ne se sent pas. Chaque niveau tardif doit rester
+résoluble à la règle et au compas — mais laborieusement. Écrire une expression prend deux
+minutes au lieu de vingt.
 
-La **loupe** refilme la même scène à travers une caméra zoomée, en partageant le `World2D`.
-Elle grossit donc tout ce qui passe dessous sans qu'un seul cas particulier soit écrit.
+**Le joueur bascule dans l'abstraction parce qu'il en a marre, jamais parce qu'on l'y force.**
 
-L'**encre** est une cible de rendu qui ne s'efface jamais (`CLEAR_MODE_NEVER`, `UPDATE_ONCE`
-à la demande). Le stylo dépose son trait une fois et il reste : une trace d'une heure ne
-coûte pas une frame de plus qu'une trace vide. C'est aussi ce qui rend l'export PNG trivial
-— la texture *est* l'image.
+### L'objet arrive avant le symbole
 
----
+Ne jamais faire apparaître un éditeur d'équations nu. Faire apparaître un **instrument qui
+contient de l'algèbre** : une règle à calcul, un abaque, un jeu de cames profilées. On
+manipule une réglette, elle multiplie. On comprend le logarithme par le geste bien avant de
+voir le mot.
 
-## Arborescence
+## 5. La boucle de jeu
 
 ```
-src/atelier/            LE JEU. Le niveau 1 et tous ses objets.
-  atelier.gd            la scène : le ressort intégré à la main, la saisie, le versage
-  unites.gd             mm, g, s — et la seule constante qui connaisse le pixel
-  reglages.gd           tous les réglages de feel, modifiables à chaud (Tab)
-  masse.gd              une masse, un crochet ou un sachet : même forme, trois états
-  ressort/feuille/stylo/regle/loupe/verseuse/enonce
-  visuel_*.gd           la couche remplaçable de chacun
-  marqueurs.gd          les points d'attache, en Marker2D nommés
-  encre.gd              une face de papier : une cible de rendu qui ne s'efface jamais
-
-src/contenu/            DONNÉE. Grandeurs, primitives, lois, formes.
-                        Valable pour les niveaux suivants ; ne dépend de rien.
-src/simulation/         La physique d'une machine, pure et déterministe, sans aucun Node.
-textures/               Déposer un PNG ici suffit à le voir apparaître.
-tests/                  Runner headless, sans dépendance.
+énoncé de commande
+   ↓
+inventaire du kit : qu'est-ce que j'ai ?
+   ↓
+monter des objets sur le plan
+   ↓
+mesurer — tracer — poser la règle
+   ↓
+produire ce qui est demandé
+   ↓
+un instrument de plus dans le kit
 ```
 
-`src/contenu/` ne dépend de rien. `src/simulation/` ne contient que des `RefCounted` —
-c'est ce qui rend la suite headless possible.
+Le verdict n'est jamais un tableau de pourcentages. **C'est ce que le joueur a effectivement
+produit** : trois sachets sur la table, pesés pour de vrai.
 
-## État actuel
+## 6. Le kit
 
-Le niveau 1 s'enchaîne de bout en bout : lire l'énoncé, clipser le stylo, marquer, décaler
-la feuille, poser la règle, verser un sachet. Moche par endroits, mais entier.
+Chaque niveau fournit une caisse à outils. Le joueur sait que la solution s'y trouve, il ne
+sait pas comment.
 
-C'est encore un prototype et il reste jetable. Il n'y a **pas** de progression, pas de
-carnet, pas de niveau 2, pas de kit générique, et rien qui enregistre ce que le joueur a
-produit.
+C'est ce qui résout le problème de la page blanche : un établi vide est paralysant, quatre
+objets sont une contrainte lisible.
+
+**Toujours inclure un ou deux objets inutiles**, hérités des niveaux précédents. Si tous les
+objets servent exactement une fois, le joueur comprend qu'il suffit de tout utiliser et le
+puzzle disparaît. L'incertitude sur l'utilité est ce qui fait qu'on réfléchit.
+
+Les objets sont des **modules** avec des points d'attache, qui se clipsent entre eux : le
+stylo sur le crochet, la sonnette sur la butée, le stylo sur une masse.
+
+## 7. Le carnet
+
+**Le carnet ne contient rien que le joueur n'ait produit lui-même.**
+
+C'est un classeur où l'on range ses feuilles tracées. Elles restent consultables et surtout
+**réutilisables** : on ressort la feuille du niveau 1 au niveau 5 et on pose sa règle dessus.
+
+Un joueur qui range bien s'y retrouve, un joueur qui range mal galère et apprend à annoter.
+
+Le carnet n'apparaît **pas** au niveau 1. Il arrive quand le joueur a sa deuxième feuille et ne
+sait pas quoi en faire. Tant qu'il n'a pas envie de garder ses traces, ne pas lui donner de
+classeur.
+
+Extension naturelle à prévoir plus tard : un calque translucide qu'on superpose à une ancienne
+feuille pour comparer deux courbes. Un outil de comparaison qui est physiquement une feuille
+sur une feuille.
+
+## 8. Progression
+
+Ce ne sont pas des chapitres de mathématiques. C'est **de l'outillage qui s'améliore**. Chaque
+niveau donne l'instrument qui rend le suivant possible.
+
+| # | Machine | Forme | Ce qu'on gagne |
+|---|---|---|---|
+| 1 | Le peson | linéaire | une balance à ±5 g |
+| 2 | L'horloge | racine | un chronomètre fiable |
+| 3 | La bouilloire | linéaire | l'enregistreur à papier défilant |
+| 4 | Le four | linéaire | un thermomètre |
+| 5 | La cuve enterrée | composition | une jauge de pression |
+| 6 | Le colorimètre | linéaire + bruit | la mesure optique |
+| 7 | Le doseur chaud | paramétrique | le mode expression |
+| 8 | La ligne électrique | quadratique caché | un manque identifié |
+
+**Niveau 1 — Le peson.** Trois sachets à 56, 89 et 143 g. La balance a un pas de 100 g. On
+clipse le stylo au crochet, on marque le 50, le 100, le 200. On pose la règle : les traits sont
+alignés et régulièrement espacés. On subdivise au compas pour fabriquer les graduations
+manquantes. Le livrable est un cadran gradué à la main. Zéro chiffre tapé, zéro formule.
+
+*Le piège : le crochet a une masse. Le zéro n'est pas là où on croit.*
+
+**Niveau 2 — L'horloge.** Il faut mesurer une durée, on n'a rien. Clepsydre d'abord (linéaire,
+grossier, dérive). Puis le pendule — et là, quadrupler la longueur double la période. Les
+écarts ne sont plus égaux. La forme `RACINE` entre par contraste avec le linéaire maîtrisé.
+
+*Le chrono touche 15 couplages sur 36. Il ne doit pas être donné, il doit être construit.*
+
+**Niveau 3 — La bouilloire.** Elle évapore tout. Avec le chrono, on relie masse d'eau et temps
+de chauffe. Le papier se monte sur une manivelle puis sur un mécanisme d'horlogerie : il défile
+seul, le stylo trace une **courbe continue en fonction du temps**. La droite ne part pas de
+zéro, la cuve met du temps à chauffer — le même terme constant qu'au niveau 1, ailleurs.
+
+**Niveau 4 — Le four.** La charge change à chaque fournée, le temporisé ne suffit plus. Un
+bilame, deux points de calibration (glace, eau bouillante), et une règle graduée à la main
+devient un thermomètre. On spécifie l'hystérésis du contact : trop serrée il claque, trop large
+la température oscille de 40 degrés. Premier vrai arbitrage d'ingénieur.
+
+**Niveau 5 — La cuve enterrée.** Opaque, un seul tube. Un piston sur un ressort au fond. Deux
+relations linéaires bout à bout **en redonnent une seule**, de pente le produit des deux.
+Premier théorème du jeu, et il justifie rétroactivement tout : n'importe quoi devient mesurable
+par chaîne.
+
+**Niveau 6 — Le colorimètre.** On fabrique ses propres étalons par dilutions. Cinq points cette
+fois, et **ils ne sont pas alignés**. Première rencontre avec le bruit : on pose la règle au
+milieu, pas sur les points. Deux points suffisent quand on fait confiance à la loi ; cinq, c'est
+quand on vérifie qu'elle s'applique.
+
+**Niveau 7 — Le doseur chaud.** Le liquide chaud se dilate, donc le coefficient de dosage n'est
+plus une constante. Impossible de graduer une règle une fois pour toutes. **C'est ici que le
+mode expression s'ouvre**, et parce qu'on en a besoin.
+
+**Niveau 8 — La ligne électrique.** Le four du fond chauffe deux fois trop lentement, le câble
+fait 40 m. Aucun ampèremètre : on mesure le courant par la chaleur, donc on ressort la
+calorimétrie du 3 et le peson du 1 pour instrumenter un circuit. On cherche une droite et on
+n'en trouve pas — il y a un quadratique caché dans la chaîne de linéaires.
+
+*Fin du chapitre : pas une victoire, un manque identifié. C'est l'ouverture du chapitre 2.*
+
+## 9. Anti-patterns — ce qui tue le jeu
+
+À relire à chaque fois qu'une fonctionnalité paraît « propre » mais ennuyeuse.
+
+- **Le formulaire déguisé.** Des champs à remplir avec un joli thème restent un formulaire.
+- **Le chocolat sur les brocolis.** Résoudre une équation pour gagner le droit de jouer. Le
+  joueur voit le péage immédiatement.
+- **Le jeu qui mesure à la place du joueur.** Des points qui apparaissent seuls sur un graphe,
+  une valeur affichée en surimpression, une longueur calculée automatiquement. Le relevé *est*
+  le métier.
+- **Le verdict binaire.** Jamais « faux ». Un écart, une courbe prédite superposée à la courbe
+  réelle, et le joueur voit *où* ça décroche.
+- **La physique décorative.** Une physique qui ne change pas ce qu'on doit faire est un habillage.
+- **Le brute-force possible.** Si une réponse est un nombre dans un champ, on la trouve en
+  balayant. La réponse doit être une action, un objet monté, ou une spécification testée sur des
+  cas inconnus.
+- **La forme vue une seule fois.** Sans trois contextes, aucun transfert.
+- **Le mur au changement de palier.** Ne jamais introduire une loi *et* demander de l'inverser
+  dans la même énigme. Une nouveauté à la fois.
+- **Le chemin unique.** Toute grandeur à déterminer doit être atteignable par au moins deux
+  chemins, sinon un joueur bloqué n'a aucune prise.
+
+## 10. Heuristiques de décision
+
+En cas de doute pendant l'implémentation, dans cet ordre :
+
+1. Est-ce que ça se manipule au lieu de se saisir ?
+2. Est-ce que le joueur produit la mesure, ou est-ce que le jeu la lui donne ?
+3. Est-ce que l'objectif est physique et concret, ou est-ce « trouve la relation » ?
+4. Est-ce qu'on aurait envie d'y jouer sans objectif pendant deux minutes ?
+5. Est-ce qu'un joueur qui déteste les maths comprendrait quoi faire ?
+
+Si une réponse est non, la fonctionnalité est à revoir même si elle marche.
+
+## 11. Contraintes techniques permanentes
+
+- Godot 4.4, GDScript, typage statique
+- **Zéro asset** : tout est dessiné en `_draw`. L'esthétique blueprint est faite de lignes.
+- Toutes les constantes de thème et de feel dans **un seul fichier**, réglables à chaud
+- La simulation reste pure, déterministe, testable en headless, sans dépendance à l'affichage
+- Le contenu est de la donnée, jamais du code : ajouter un niveau ne doit pas modifier le moteur
+- **Aucun chiffre affiché par le jeu.** Les seuls chiffres à l'écran sont ceux gravés sur les
+  instruments, et c'est au joueur de les lire.
+
+## 12. Hors périmètre pour l'instant
+
+Pas de menu, pas de sauvegarde, pas de son, pas de localisation, pas de textures. La boucle
+n'est pas encore prouvée amusante ; tout le reste est prématuré.
