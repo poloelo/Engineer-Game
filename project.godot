@@ -5,8 +5,8 @@ config_version=5
 [application]
 
 config/name="Le Jeu de l'Ingenieur"
-config/description="Un ingenieur devant un plan technique. Observer, mesurer, specifier."
-run/main_scene="res://src/presentation/machines/peson/peson.tscn"
+config/description="Un jeu d'instruments : on fabrique ses propres mesures."
+run/main_scene="res://src/atelier/atelier.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [debug]
@@ -14,6 +14,10 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 gdscript/warnings/untyped_declaration=2
 gdscript/warnings/unsafe_property_access=1
 gdscript/warnings/unsafe_method_access=1
+
+[physics]
+
+2d/default_gravity=9810.0
 
 [display]
 
