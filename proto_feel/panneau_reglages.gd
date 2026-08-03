@@ -3,6 +3,12 @@
 # Des curseurs, oui : c'est un outil de reglage, pas une mecanique de jeu. Regler
 # a chaud est la seule facon d'affiner un feel — sinon on relance trente fois et
 # on n'ajuste jamais vraiment.
+#
+# La gravite n'est PAS ici et n'y sera pas. Elle vaut 9,81 m/s2. Si la sensation
+# ne va pas, on ajuste les masses, les raideurs ou l'echelle de temps — qui, elle,
+# est en haut de la liste.
+#
+# Toutes les bornes sont en mm, g, s.
 extends CanvasLayer
 
 const Reglages: GDScript = preload("res://reglages.gd")
@@ -29,7 +35,10 @@ func _ready() -> void:
 		colonne.add_child(_curseur(ligne[0], ligne[1], ligne[2], ligne[3]))
 
 	var aide: Label = Label.new()
-	aide.text = "Tab masquer · R ranger · Espace ou clic droit : pointe · F retourner · P feuille vierge"
+	aide.text = (
+		"Tab masquer · R ranger · Espace ou clic droit : pointe\n"
+		+ "F retourner la feuille · P effacer la face · N feuille vierge · E exporter en PNG"
+	)
 	aide.add_theme_font_size_override("font_size", 11)
 	aide.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.4))
 	colonne.add_child(aide)
@@ -49,31 +58,33 @@ func _input(evenement: InputEvent) -> void:
 ## pas besoin d'une paire de Callables par ligne.
 func _lignes() -> Array:
 	return [
-		["RAIDEUR", "Raideur ressort", 10.0, 200.0],
-		["AMORTISSEMENT", "Amortissement axial", 0.0, 20.0],
-		["AMORTISSEMENT_LATERAL", "Amortissement lateral", 0.0, 14.0],
-		["LONGUEUR_REPOS", "Longueur au repos", 40.0, 200.0],
-		["GRAVITE", "Gravite", 500.0, 8000.0],
-		["RAIDEUR_CURSEUR", "Rappel curseur", 80.0, 1600.0],
-		["AMORTISSEMENT_CURSEUR", "Amortissement curseur", 5.0, 90.0],
+		["ECHELLE_TEMPS", "Echelle de temps", 0.1, 2.0],
+		["RAIDEUR", "Raideur ressort (g/s2)", 400.0, 12000.0],
+		["AMORTISSEMENT", "Amortissement axial", 0.0, 120.0],
+		["AMORTISSEMENT_LATERAL", "Amortissement lateral (1/s)", 0.0, 12.0],
+		["LONGUEUR_REPOS", "Longueur au repos (mm)", 20.0, 120.0],
+		["MASSE_CROCHET", "Masse du crochet (g)", 0.0, 40.0],
+		["MASSE_RESSORT", "Masse du ressort (g)", 0.0, 60.0],
+		["RAIDEUR_CURSEUR", "Rappel curseur (g/s2)", 1000.0, 25000.0],
+		["AMORTISSEMENT_CURSEUR", "Amortissement curseur", 10.0, 320.0],
 		["COMPENSATION_POIDS", "Compensation du poids", 0.0, 1.0],
-		["RAYON_AIMANTATION", "Rayon d'aimantation", 15.0, 160.0],
-		["FORCE_AIMANTATION", "Force d'aimantation", 0.0, 3000.0],
-		["AMPLITUDE_SURSAUT", "Sursaut d'accrochage", 0.0, 900.0],
-		["SEUIL_DECROCHAGE", "Seuil de decrochage", 30.0, 320.0],
+		["RAYON_AIMANTATION", "Rayon d'aimantation (mm)", 8.0, 80.0],
+		["FORCE_AIMANTATION", "Force d'aimantation (mm/s2)", 0.0, 6000.0],
+		["AMPLITUDE_SURSAUT", "Sursaut d'accrochage (mm/s)", 0.0, 500.0],
+		["SEUIL_DECROCHAGE", "Seuil de decrochage (mm)", 15.0, 160.0],
 		["TRANSMISSION_CHOC", "Transmission du choc", 0.0, 2.0],
 		["REBOND", "Rebond", 0.0, 0.9],
 		["FRICTION", "Friction", 0.0, 2.0],
 		["FREIN_ROULEMENT", "Frein de roulement", 0.0, 8.0],
-		["AMORTISSEMENT_BUTEE", "Amortissement butee", 5.0, 60.0],
-		["BALLANT", "Ballant du ressort", 0.0, 0.3],
-		["LARGEUR_SPIRE", "Largeur des spires", 4.0, 40.0],
+		["AMORTISSEMENT_BUTEE", "Amortissement butee", 20.0, 400.0],
+		["BALLANT", "Ballant du ressort (s)", 0.0, 0.3],
+		["LARGEUR_SPIRE", "Largeur des spires (mm)", 2.0, 20.0],
 		["SOUPLESSE_CHAINE", "Souplesse de la chaine", 0.02, 1.0],
-		["SEUIL_REPOS", "Seuil de repos", 0.0, 14.0],
-		["RAYON_CLIPSAGE", "Rayon de clipsage", 15.0, 130.0],
-		["PAS_TRACE", "Finesse de la trace", 0.5, 10.0],
-		["AIMANT_REGLE", "Aimant de la regle", 5.0, 70.0],
-		["RAYON_LOUPE", "Rayon de la loupe", 30.0, 160.0],
+		["SEUIL_REPOS", "Seuil de repos (mm)", 0.0, 5.0],
+		["RAYON_CLIPSAGE", "Rayon de clipsage (mm)", 8.0, 65.0],
+		["PAS_TRACE", "Finesse de la trace (mm)", 0.2, 5.0],
+		["AIMANT_REGLE", "Aimant de la regle (mm)", 2.0, 35.0],
+		["RAYON_LOUPE", "Rayon de la loupe (mm)", 15.0, 80.0],
 		["GROSSISSEMENT_LOUPE", "Grossissement", 1.5, 7.0],
 	]
 

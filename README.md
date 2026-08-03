@@ -8,7 +8,7 @@ technique. Le banc d'essai simule la machine avec sa pièce et lui montre le ré
 Aucun QCM, aucune note, aucun texte pédagogique. L'échec n'affiche jamais « faux » : il
 affiche un **écart** et une **courbe prédite superposée à la courbe réelle**.
 
-Godot 4.4 · GDScript typé · aucun asset externe, tout est dessiné dans `_draw`.
+Godot 4.7.1 · GDScript typé · aucun asset externe, tout est dessiné dans `_draw`.
 
 ---
 
@@ -19,6 +19,22 @@ godot --path . # ou ouvrir le projet dans l'éditeur
 ```
 
 La scène principale est `src/presentation/machines/peson/peson.tscn`.
+
+### Le prototype de feel
+
+`proto_feel/` est un **projet Godot autonome et jetable**, sans aucune dépendance à `src/`.
+On y règle la sensation du ressort, des masses et des instruments, à chaud (Tab).
+
+```sh
+godot --path proto_feel
+```
+
+Sa règle du jeu tient en une phrase : **le monde est en millimètres, en grammes et en
+secondes.** La gravité vaut 9,81 m/s² et n'est pas réglable ; une seule constante
+(`unites.gd : PIXELS_PAR_MM`) fait la conversion, au réglage de la caméra et nulle part
+ailleurs. La conséquence recherchée est qu'une graduation gravée à 10 mm sur la règle
+couvre réellement 10 mm de monde — pour un jeu dont le sujet est la mesure, l'instrument ne
+peut pas mentir.
 
 ## Tester
 

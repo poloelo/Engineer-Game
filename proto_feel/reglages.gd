@@ -1,5 +1,12 @@
 # Tous les reglages de feel, au meme endroit, modifiables a chaud (Tab).
 #
+# TOUT EST EN MILLIMETRES, GRAMMES ET SECONDES. Aucune valeur de ce fichier n'est
+# en pixels. Une force se compte en g.mm/s2 (10^-6 N), une raideur en g/s2
+# (10^-6 N/mm), un amortissement lateral en 1/s.
+#
+# La gravite n'est pas ici : elle vaut 9,81 m/s2, c'est une constante universelle
+# et non un parametre de feel. Voir unites.gd.
+#
 # Ce sont des `static var` et non des constantes, justement pour que le panneau
 # de debug puisse les tripoter pendant que le jeu tourne.
 #
@@ -7,38 +14,54 @@
 # registre global du projet principal qui vit a cote.
 extends RefCounted
 
+# --- Temps -------------------------------------------------------------------
+
+## Echelle de temps globale. A 1.0 le montage tourne en temps reel. En dessous,
+## tout ralentit ensemble — le ressort, les chutes, le curseur — sans qu'aucune
+## grandeur physique ne mente. C'est le seul levier de feel qui touche a g sans
+## y toucher.
+static var ECHELLE_TEMPS: float = 1.0
+
 # --- Ressort -----------------------------------------------------------------
 
-## Longueur du ressort sans rien accroche, en pixels.
-static var LONGUEUR_REPOS: float = 95.0
+## Longueur du ressort sans rien accroche, en mm.
+static var LONGUEUR_REPOS: float = 48.0
 
-## Raideur. Plus c'est haut, moins ca s'allonge et plus ca oscille vite.
-static var RAIDEUR: float = 70.0
+## Raideur, en g/s2 (2600 g/s2 = 2,6 N/m). Ressort souple de peson leger : 10 g
+## suspendus l'allongent de 38 mm.
+static var RAIDEUR: float = 2600.0
+
+## Masse totale du fil du ressort, en g. Elle sert deux fois, et pas avec le meme
+## coefficient — c'est le resultat classique du ressort pesant :
+##   - un tiers s'ajoute a l'inertie de la charge (elle fixe la frequence),
+##   - une moitie s'ajoute au poids suspendu (elle etire le ressort a vide).
+## C'est la « masse lineique » du brief, faite au moins cher.
+static var MASSE_RESSORT: float = 18.0
+
+## Masse du crochet, en g. Le piege du niveau 1 tient dans cette valeur : le zero
+## du joueur n'est pas la ou il croit parce que son instrument pese deja.
+## Devissable — retirer le crochet fait remonter le ressort de 30 mm.
+static var MASSE_CROCHET: float = 8.0
 
 ## Amortissement le long de l'axe du ressort : c'est lui qui calme le yoyo.
 ## Applique en racine de la masse, pour que le taux d'amortissement ne depende
 ## pas de la charge — sans quoi une masse lourde revient dans du sirop et une
 ## masse legere claque, avec le meme reglage.
-static var AMORTISSEMENT: float = 5.2
+static var AMORTISSEMENT: float = 32.0
 
 ## Amortissement perpendiculaire a l'axe : c'est lui qui calme le balancement.
-## Separe de l'axial exprès — un ressort qui rebondit court mais balance
-## longtemps ne se regle pas comme l'inverse, et les deux valent d'etre essayes.
-static var AMORTISSEMENT_LATERAL: float = 1.5
+## En 1/s : la moitie de cette valeur est le taux de decroissance du ballant,
+## independamment de la charge et des unites.
+static var AMORTISSEMENT_LATERAL: float = 2.0
 
 ## Amortissement quand la butee est rabattue. Doit etre assez haut pour figer net.
-static var AMORTISSEMENT_BUTEE: float = 26.0
+static var AMORTISSEMENT_BUTEE: float = 160.0
 
-## Masse propre du ressort. Evite qu'il devienne infiniment nerveux a vide.
-static var MASSE_RESSORT: float = 0.18
-
-## Gravite appliquee au ressort ET aux masses libres.
-static var GRAVITE: float = 3200.0
-
-## Amplitude d'oscillation restante, en pixels, en dessous de laquelle le ressort
-## se pose franchement. Sans ce seuil il fremit indefiniment, ce qui est
-## insupportable quand on essaie de lire une position.
-static var SEUIL_REPOS: float = 4.0
+## Amplitude d'oscillation restante, en mm, en dessous de laquelle le ressort se
+## pose franchement. Sans ce seuil il fremit indefiniment, ce qui est
+## insupportable quand on essaie de lire une position au millimetre — et
+## maintenant le millimetre est un vrai millimetre, donc le seuil est serre.
+static var SEUIL_REPOS: float = 0.6
 
 ## Retard angulaire d'un maillon sur le precedent. C'est le flottement entre deux
 ## masses empilees. A 1.0 la chaine est rigide.
@@ -46,13 +69,13 @@ static var SOUPLESSE_CHAINE: float = 0.22
 
 # --- Traine au curseur -------------------------------------------------------
 
-## Rappel vers le pointeur. Bas = l'objet traine loin derriere, haut = il colle.
-static var RAIDEUR_CURSEUR: float = 650.0
+## Rappel vers le pointeur, en g/s2. Bas = l'objet traine loin derriere, haut =
+## il colle.
+static var RAIDEUR_CURSEUR: float = 8600.0
 
 ## Amortissement de la traine. Applique en racine de la masse, pour que le temps
 ## de reponse depende du poids sans que les petites masses deviennent pateuses.
-## Au-dela de ~40 tout devient sirupeux, en dessous de ~20 tout depasse la cible.
-static var AMORTISSEMENT_CURSEUR: float = 34.0
+static var AMORTISSEMENT_CURSEUR: float = 124.0
 
 ## Part du poids compensee pendant qu'on traine. A 1.0 l'objet ne pese plus rien
 ## au curseur ; a 0.0 il pend franchement sous le pointeur.
@@ -60,18 +83,23 @@ static var COMPENSATION_POIDS: float = 0.75
 
 # --- Accrochage --------------------------------------------------------------
 
-## Rayon de la zone d'aimantation autour du point d'accroche.
-static var RAYON_AIMANTATION: float = 62.0
+## Rayon de la zone d'aimantation autour du point d'accroche, en mm.
+static var RAYON_AIMANTATION: float = 31.0
 
-## Attraction ressentie quand on entre dans la zone. Met un peu de colle.
-static var FORCE_AIMANTATION: float = 900.0
+## Attraction ressentie quand on entre dans la zone, en mm/s2. Met un peu de
+## colle. Relevee par rapport a l'ancienne valeur : la gravite visible ayant
+## augmente avec le passage a g reel, une aimantation convertie telle quelle ne
+## faisait plus le poids.
+static var FORCE_AIMANTATION: float = 1200.0
 
-## Coup de fouet donne au ressort au moment ou ca accroche. C'est le "clac".
-static var AMPLITUDE_SURSAUT: float = 300.0
+## Coup de fouet donne au ressort au moment ou ca accroche, en mm/s. C'est le
+## "clac".
+static var AMPLITUDE_SURSAUT: float = 150.0
 
-## Allongement supplementaire, au-dela de l'equilibre, qui fait lacher la prise.
-## Bas = ca decroche tout le temps par accident, haut = on n'arrive plus a retirer.
-static var SEUIL_DECROCHAGE: float = 105.0
+## Allongement supplementaire, au-dela de l'equilibre, qui fait lacher la prise,
+## en mm. Bas = ca decroche tout le temps par accident, haut = on n'arrive plus
+## a retirer.
+static var SEUIL_DECROCHAGE: float = 52.0
 
 ## Part de la vitesse d'une masse qui percute la chaine, transmise au ressort.
 static var TRANSMISSION_CHOC: float = 0.55
@@ -89,19 +117,20 @@ static var FREIN_ROULEMENT: float = 1.4
 
 # --- Instruments de trace ----------------------------------------------------
 
-## Distance a laquelle le stylo se clipse sur un element mobile.
-static var RAYON_CLIPSAGE: float = 46.0
+## Distance a laquelle le stylo se clipse sur un marqueur, en mm.
+static var RAYON_CLIPSAGE: float = 23.0
 
-## Deplacement minimal de la pointe avant d'ajouter un point a la trace.
+## Deplacement minimal de la pointe avant d'ajouter un point a la trace, en mm.
 ## Bas = trace tres fine mais lourde, haut = trace anguleuse.
-static var PAS_TRACE: float = 1.6
+static var PAS_TRACE: float = 0.8
 
 ## Distance en dessous de laquelle la regle se cale d'elle-meme sur un trait de
-## stylo. Legere : elle aide a poser le zero sur une marque, elle ne colle pas.
-static var AIMANT_REGLE: float = 22.0
+## stylo, en mm. Legere : elle aide a poser le zero sur une marque, elle ne colle
+## pas.
+static var AIMANT_REGLE: float = 11.0
 
-## Rayon de la loupe, en pixels a l'ecran.
-static var RAYON_LOUPE: float = 78.0
+## Rayon de la loupe, en mm de monde — elle a une taille physique comme le reste.
+static var RAYON_LOUPE: float = 39.0
 
 ## Grossissement de la loupe. En dessous de 2 elle ne sert a rien.
 static var GROSSISSEMENT_LOUPE: float = 3.2
@@ -111,9 +140,11 @@ static var GROSSISSEMENT_LOUPE: float = 3.2
 ## Nombre de spires. Elles s'ecartent toutes seules quand le ressort s'etire.
 static var SPIRES: int = 13
 
-## Demi-largeur d'une spire au repos. Le ressort se pince quand il s'allonge.
-static var LARGEUR_SPIRE: float = 18.0
+## Demi-largeur d'une spire au repos, en mm. Le ressort se pince quand il
+## s'allonge.
+static var LARGEUR_SPIRE: float = 9.0
 
-## Ballant lateral du ressort en mouvement. C'est ce qui lui donne l'air vivant.
-## A 0 il monte et descend comme un piston.
+## Ballant lateral du ressort en mouvement, en secondes (il convertit une vitesse
+## en un ecart). C'est ce qui lui donne l'air vivant. A 0 il monte et descend
+## comme un piston.
 static var BALLANT: float = 0.075
