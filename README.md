@@ -1,40 +1,39 @@
 # Le Jeu de l'Ingénieur
 
-Le joueur est un ingénieur devant un plan technique. Une machine est cassée. Il observe le
-symptôme, identifie une grandeur invisible, trouve un proxy mesurable relié par une loi
-physique, mesure, inverse la relation, et **spécifie une pièce** en remplissant une fiche
-technique. Le banc d'essai simule la machine avec sa pièce et lui montre le résultat.
+Un jeu d'instruments. On ne répond pas à des questions : **on fabrique ses propres mesures**,
+à la main, avec ce qu'on a sur l'établi.
 
-Aucun QCM, aucune note, aucun texte pédagogique. L'échec n'affiche jamais « faux » : il
-affiche un **écart** et une **courbe prédite superposée à la courbe réelle**.
+Le joueur reçoit une commande. Ses instruments sont trop grossiers pour l'honorer. Il en
+construit un meilleur — un ressort, un crochet, des masses étalons, un stylo, une feuille,
+une règle — puis il s'en sert.
 
-Godot 4.7.1 · GDScript typé · aucun asset externe, tout est dessiné dans `_draw`.
+Aucun QCM, aucune note, aucune étoile, aucun verdict. Rien ne vérifie ce qui sort de
+l'atelier. Le seul texte du jeu est le bon de travail ; les seuls chiffres sont gravés sur
+la règle et écrits sur ce bon.
+
+Godot 4.7.1 · GDScript typé · tout est dessiné dans `_draw`, les textures sont optionnelles.
 
 ---
 
 ## Lancer
 
 ```sh
-godot --path . # ou ouvrir le projet dans l'éditeur
+godot --path .        # ou ouvrir le projet dans l'éditeur
 ```
 
-La scène principale est `src/presentation/machines/peson/peson.tscn`.
+La scène principale est `src/atelier/atelier.tscn` — c'est le niveau 1, et pour l'instant
+tout le jeu.
 
-### Le prototype de feel
-
-`proto_feel/` est un **projet Godot autonome et jetable**, sans aucune dépendance à `src/`.
-On y règle la sensation du ressort, des masses et des instruments, à chaud (Tab).
-
-```sh
-godot --path proto_feel
-```
-
-Sa règle du jeu tient en une phrase : **le monde est en millimètres, en grammes et en
-secondes.** La gravité vaut 9,81 m/s² et n'est pas réglable ; une seule constante
-(`unites.gd : PIXELS_PAR_MM`) fait la conversion, au réglage de la caméra et nulle part
-ailleurs. La conséquence recherchée est qu'une graduation gravée à 10 mm sur la règle
-couvre réellement 10 mm de monde — pour un jeu dont le sujet est la mesure, l'instrument ne
-peut pas mentir.
+| Geste | Comment |
+|---|---|
+| prendre, poser, accrocher | clic gauche maintenu |
+| baisser / lever la pointe du stylo | espace, ou clic droit |
+| clipser le stylo sur une masse | le lâcher à côté d'elle |
+| faire pivoter la règle | l'attraper par un bout au lieu du corps |
+| incliner le pot de poudre | l'attraper par sa poignée, en haut |
+| ranger les masses · retourner la feuille | `R` · `F` |
+| effacer la face · feuille vierge · exporter en PNG | `P` · `N` · `E` |
+| régler la physique à chaud | `Tab` |
 
 ## Tester
 
@@ -44,248 +43,123 @@ GODOT=/chemin/vers/godot tests/run.sh
 ```
 
 Le runner est headless, sans dépendance externe, et rend un code de sortie non nul en cas
-d'échec — utilisable tel quel en intégration continue.
+d'échec.
 
 ```
-OK — 40 tests, 189 verifications, 0 echec
+OK — 14 tests, 36 verifications, 0 echec
 ```
+
+Les tests portent sur le **contenu** (lois, grandeurs, formes) et sur la **physique d'une
+machine**. L'atelier lui-même n'est pas testé : c'est de la manipulation, ça se juge à la
+main.
 
 ---
 
-## Le principe d'architecture
+## Le niveau 1
 
-**Le contenu est de la donnée, jamais du code.** Ajouter une machine consiste à écrire un
-fichier de ressource, sans toucher au moteur.
+> Trois sachets de poudre : 56 g, 89 g, 143 g.
 
-```
-CONTENU  (ressources .tres : machines, lois, grandeurs)
-   ↓  lu par
-SIMULATION  (pure, déterministe, aucune dépendance à l'affichage)
-   ↓  observée par
-PRÉSENTATION  (scènes, dessin, UI)
-```
+La balance de l'atelier a un pas de 100 g. Elle ne bouge pas. Le kit contient un ressort,
+un crochet, quatre masses étalons (20, 50, 100, 150 g), un stylo, une feuille, une règle et
+une loupe.
 
-Les dépendances ne vont que dans un sens. `src/contenu/` ne dépend de rien.
-`src/simulation/` ne contient que des `RefCounted`, aucun `Node` — c'est ce qui rend la
-suite headless possible et c'est le critère qui valide toute l'architecture.
+Le parcours attendu, que rien n'impose et que rien ne guide :
 
-La présentation **appelle** les méthodes de la simulation ; la simulation ne répond que par
-**signaux** et ne connaît aucun nœud.
+1. clipser le stylo au crochet, pointe baissée ;
+2. accrocher un étalon — le ressort descend, le stylo marque le papier ;
+3. recommencer avec les autres étalons, en décalant la feuille entre deux ;
+4. poser la règle sur les marques, constater qu'elles sont **régulièrement espacées**,
+   subdiviser à la main pour fabriquer les graduations manquantes ;
+5. pendre un sachet vide, incliner le pot, et verser jusqu'à sa propre marque.
+
+Le livrable du niveau n'est pas une équation. C'est **un cadran gradué à la main et trois
+sachets produits**.
+
+**Deux pièges, et ce sont les mêmes.** Le crochet pèse 8 g et le sachet vide 12 g. Ils
+étirent déjà le ressort avant qu'on ait rien accroché : le zéro du joueur n'est pas là où
+il croit. Le crochet se dévisse — c'est le geste qui fait comprendre d'où vient l'écart.
+
+Les quatre paliers, mesurés à l'arrêt : **85,81 · 116,47 · 167,56 · 218,65 mm**, soit
+1,0219 mm/g d'un bout à l'autre. C'est cette régularité qui autorise la subdivision, et
+aucune combinaison d'étalons ne tombe sur 56, 89 ni 143.
+
+---
+
+## Comment c'est fait
+
+### Le monde est en millimètres
+
+Toute la simulation est en **mm, g, s** — forces en g·mm/s². La gravité vaut 9,81 m/s² et
+n'est pas réglable. Une seule constante, `unites.gd : PIXELS_PAR_MM`, relie le monde à
+l'écran, et elle ne sert qu'au zoom de la `Camera2D`.
+
+Conséquence recherchée : **une graduation gravée à 10 mm couvre réellement 10 mm de monde.**
+Pour un jeu dont le sujet est la mesure, l'instrument ne peut pas mentir. Le jeu tourne à
+l'identique en 1152 × 648 et en 4K — la résolution est un problème de caméra, jamais de
+physique.
+
+### Physique hybride
+
+Les masses libres sont des `RigidBody2D` : chute, rebond, empilement, roulement, le moteur
+le fait mieux et gratuitement. **Le ressort est intégré à la main**, et il le reste : un
+`DampedSpringJoint2D` donnerait un pendule mou impossible à régler, alors que deux
+constantes lisibles se règlent en dix secondes (`Tab`).
+
+Le ressort est libre dans le plan. Sa force s'applique le long de son axe courant, la
+gravité reste verticale ; le balancement n'est écrit nulle part, il tombe de la combinaison
+des deux.
+
+### Deux couches par objet
+
+Chaque objet est coupé en une **forme** (collision, masse, points d'attache — elle ne change
+jamais) et un **visuel** enfant remplaçable, qui prend une texture si elle existe et retombe
+sur le dessin procédural sinon. Déposer `textures/masse_50g.png` suffit — voir
+`textures/LISEZMOI.md`.
+
+Les points d'attache sont des `Marker2D` nommés (`crochet`, `pointe`, `bord_zero`,
+`goulot`, `bouche`), cherchés par genre et par rayon. Aucune position n'est écrite en dur
+dans la logique de clipsage.
+
+### La loupe et l'encre sont des `SubViewport`
+
+La **loupe** refilme la même scène à travers une caméra zoomée, en partageant le `World2D`.
+Elle grossit donc tout ce qui passe dessous sans qu'un seul cas particulier soit écrit.
+
+L'**encre** est une cible de rendu qui ne s'efface jamais (`CLEAR_MODE_NEVER`, `UPDATE_ONCE`
+à la demande). Le stylo dépose son trait une fois et il reste : une trace d'une heure ne
+coûte pas une frame de plus qu'une trace vide. C'est aussi ce qui rend l'export PNG trivial
+— la texture *est* l'image.
 
 ---
 
 ## Arborescence
 
 ```
-project.godot                          scène principale, typage statique imposé par les warnings
+src/atelier/            LE JEU. Le niveau 1 et tous ses objets.
+  atelier.gd            la scène : le ressort intégré à la main, la saisie, le versage
+  unites.gd             mm, g, s — et la seule constante qui connaisse le pixel
+  reglages.gd           tous les réglages de feel, modifiables à chaud (Tab)
+  masse.gd              une masse, un crochet ou un sachet : même forme, trois états
+  ressort/feuille/stylo/regle/loupe/verseuse/enonce
+  visuel_*.gd           la couche remplaçable de chacun
+  marqueurs.gd          les points d'attache, en Marker2D nommés
+  encre.gd              une face de papier : une cible de rendu qui ne s'efface jamais
 
-src/contenu/                           COUCHE CONTENU — schémas de ressources, aucune logique de jeu
-  forme.gd                             les 7 formes mathématiques transverses (LINEAIRE, RACINE…)
-  grandeur.gd                          une grandeur physique : id, nom, symbole, unité
-  primitive.gd                         une des 8 primitives, et sa résolution
-  loi.gd                               un couplage orienté entre grandeurs — le cœur, voir plus bas
-  evaluateur_expression.gd             rend exécutable une formule écrite dans un .tres
-  emplacement_piece.gd                 la fiche technique à remplir : gabarit, champs, axes, récompense
-  cas_test.gd                          un cas caché sur lequel le banc éprouve la pièce
-  machine_def.gd                       une machine : symptôme, loi cachée, emplacements, cas cachés
-  catalogue.gd                         accès par identifiant au contenu posé sur le disque
-
-  data/grandeurs/    14 fichiers       les 14 grandeurs de l'annexe B
-  data/primitives/    8 fichiers       les 8 primitives de l'annexe A
-  data/lois/          2 fichiers       hooke, peson_ressort
-  data/machines/      1 fichier        peson
-
-src/simulation/                        COUCHE SIMULATION — RefCounted uniquement, testable headless
-  specification.gd                     le modèle paramétré que le joueur soumet
-  generateur_mesure.gd                 traduit une valeur vraie en ce que l'instrument affiche
-  resultat_banc.gd                     écart, paliers d'étoiles, deux séries de points
-  piece.gd                             une spécification validée, devenue instrument
-  simulation_machine.gd                le moteur d'une machine : relevés, banc, courbes
-
-src/presentation/                      COUCHE PRÉSENTATION
-  theme/constantes_theme.gd            LE SEUL fichier de couleurs, tailles et épaisseurs
-  composants/graphe/                   le graphe : relevés, modèle en surimpression, machine réelle
-  composants/fiche_technique/          des champs numériques vides, jamais un curseur
-  composants/banc_essai/               l'écart cas par cas, les étoiles dessinées au trait
-  composants/barre_primitives/         valeurs de référence et résolution des instruments
-  ecran_machine/ecran_machine.gd       l'écran de jeu, valable pour TOUTE machine
-  machines/peson/                      plan dessiné du peson + assemblage de la scène
-
-tests/
-  run.sh, run_tests.gd                 runner headless, découverte automatique des suites
-  support/test_base.gd                 socle d'assertions
-  test_loi.gd                          évaluation et inversion depuis la donnée
-  test_simulation_machine_peson.gd     le parcours complet du joueur, sans ouvrir une scène
-  test_graphe.gd                       géométrie du graphe : graduations, cadrage, découpe
-  test_ecran_machine.gd                câblage complet, du bouton au verdict
+src/contenu/            DONNÉE. Grandeurs, primitives, lois, formes.
+                        Valable pour les niveaux suivants ; ne dépend de rien.
+src/simulation/         La physique d'une machine, pure et déterministe, sans aucun Node.
+textures/               Déposer un PNG ici suffit à le voir apparaître.
+tests/                  Runner headless, sans dépendance.
 ```
 
----
-
-## Le modèle de données
-
-### Loi
-
-Une loi porte à la fois sa physique et sa **forme mathématique**, qui est transverse : Hooke,
-Ohm et le débit constant sont trois lois sans rapport qui partagent la forme `LINEAIRE`.
-C'est le contenu pédagogique du jeu, donc un champ de premier ordre.
-
-Les formules sont du **texte**, évalué par la classe `Expression` du moteur. Les variables
-disponibles sont les identifiants des grandeurs couplées, plus les paramètres.
-
-```gdscript
-id = &"hooke"
-nom_physique = "Hooke"
-forme = 0                                   # LINEAIRE
-grandeurs_entree = [&"force"]               # toujours un tableau, même à un élément
-grandeurs_sortie = [&"longueur"]
-parametres = ["l0", "k"]
-parametres_defaut = { "l0": 60.0, "k": 0.5 }
-expression = "l0 + force / k"
-expression_inverse = "(longueur - l0) * k"
-invertibilite = 0                           # INVERSIBLE | PARTIELLE | NON_INVERSIBLE
-outils_requis = [&"voir"]
-```
-
-**L'inverse est une seconde formule déclarée, pas une inversion symbolique calculée.** Il n'y
-a que trente-six lois, écrites une fois par un humain qui connaît l'algèbre : un moteur de
-calcul formel serait un projet à lui seul pour zéro gain. Les cas non inversibles (le volume
-de la boîte : il faut chercher un maximum) portent `NON_INVERSIBLE` et une formule inverse
-vide — la résolution est alors un algorithme, pas une formule retournée.
-
-`Loi.verifier()` rend la liste des problèmes structurels en langage clair : formule illisible,
-loi déclarée inversible sans inverse, aucun outil requis.
-
-### EmplacementPiece
-
-Le point d'extension central. Il déclare ce que le joueur doit spécifier, et la récompense.
-
-```gdscript
-gabarit = "a * lecture + b"                 # le modèle qu'il paramètre
-parametres = ["a", "b"]                     # un champ numérique vide par nom
-entrees_gabarit = [&"lecture"]              # ce que le banc fournit au gabarit
-grandeur_lue = &"longueur"                  # axe des abscisses du graphe
-grandeur_produite = &"masse"                # axe des ordonnées, et valeur comparée à la vérité
-primitive_amelioree = &"peser"              # la récompense : un instrument plus fin
-pas_ameliore = 5.0                          # de 100 g à 5 g
-```
-
-### MachineDef
-
-```gdscript
-symptome                                    # constaté, jamais expliqué
-loi_cachee                                  # la physique réelle, invisible du joueur
-parametres_caches                           # surcharge les constantes de la loi
-emplacements                                # les pièces à spécifier
-cas_test_caches                             # l'épreuve finale, jamais montrée avant
-etalons                                     # les valeurs de référence que le joueur peut imposer
-primitive_lue / primitive_produite          # ses instruments (null = valeur connue exactement)
-matiere_initiale                            # budget de soumissions
-```
-
-Le **sens de la loi n'est pas codé en dur** : que la grandeur lue soit l'entrée ou la sortie
-de la loi cachée, l'état caché se complète tout seul par évaluation ou par inversion. C'est
-ce qui permet au peson (masse → longueur, on lit la sortie) et à une bouilloire
-(volume → temps, on lit l'entrée) d'utiliser le même moteur.
-
----
-
-## La validation
-
-Le joueur ne soumet **jamais un nombre-réponse**. Il soumet une spécification paramétrée,
-évaluée sur des cas cachés qu'il n'a jamais vus. Le brute-force est donc mécaniquement
-impossible, sans avoir besoin de l'interdire.
-
-Le résultat n'est pas binaire mais un écart relatif, avec des paliers sur le **pire** cas :
-
-| écart maximal | étoiles |
-|---|---|
-| ≤ 20 % | 1 — ça passe, on avance |
-| ≤ 5 % | 2 |
-| ≤ 1 % | 3 |
-
-Une pièce à une étoile entre à l'atelier : on peut progresser avec un modèle médiocre et
-revenir plus tard. Chaque soumission consomme de la matière (12 au départ) : assez pour que
-le tâtonnement reste légitime, pas assez pour balayer au hasard.
-
-Le banc n'applique **aucune** imprécision d'instrument : il simule la machine équipée de la
-pièce. Ce que le joueur combat, c'est la grossièreté de ses propres mesures pendant la
-calibration, pas un banc capricieux.
-
----
-
-## La machine 1 : le peson
-
-La balance de l'atelier a un pas de 100 g, inutilisable. Le joueur dispose d'un ressort,
-d'une règle graduée au millimètre et de masses étalons.
-
-Physique cachée : longueur à vide 60 mm, sensibilité 0,18 mm/g, **crochet 8 g**. Le crochet
-décale la droite : la relation n'est pas proportionnelle mais affine. C'est le piège.
-
-Solution attendue : `masse = 5,556 × lecture − 341,3`, éprouvée sur trois masses cachées.
-Récompense : la primitive « peser » passe de ±100 g à ±5 g.
-
-Un joueur qui suppose la proportionnalité (`b = 0`) obtient 136 % d'écart et voit sa courbe
-décrocher visiblement de la machine réelle. Rien n'affiche « faux ».
-
-> **Note de conception.** Le jeu d'étalons est `5, 10, 25, 50, 100, 200, 500 g` et non des
-> valeurs rondes uniquement. À 0,18 mm/g, toutes les masses rondes au-delà de 50 g tombent sur
-> la même erreur d'arrondi au millimètre, ce qui rendait la pente **juste par accident** quel
-> que soit le soin du joueur. Les petites valeurs rétablissent l'enjeu : calibrer sur un bras
-> de levier court donne une étoile, sur le bras le plus long en donne trois.
-
----
-
-## Ajouter une machine
-
-C'est le critère qui valide l'architecture. Une machine nouvelle demande :
-
-1. un `.tres` de `Loi` si elle introduit une physique inédite ;
-2. un `.tres` de `MachineDef` avec son emplacement de pièce et ses cas cachés ;
-3. une scène de deux références — `EcranMachine` avec `definition` et, si on veut un dessin,
-   `plan`.
-
-**Aucun fichier de `src/simulation/` ne bouge.** `EcranMachine` est générique : il ne connaît
-aucune machine en particulier. Le plan dessiné est optionnel ; une machine sans plan reste
-jouable, le graphe suffit.
-
-Les fichiers de données s'éditent dans l'inspecteur Godot. Attention si tu en écris un à la
-main : la notation des tableaux typés de ressources n'est pas devinable
-(`Array[ExtResource("2_xxx")]([SubResource("...")])`) — passer par l'inspecteur ou par
-`ResourceSaver` évite bien des surprises.
-
----
+`src/contenu/` ne dépend de rien. `src/simulation/` ne contient que des `RefCounted` —
+c'est ce qui rend la suite headless possible.
 
 ## État actuel
 
-Fait — le socle complet et la machine 1, jouable de bout en bout, 40 tests headless.
+Le niveau 1 s'enchaîne de bout en bout : lire l'énoncé, clipser le stylo, marquer, décaler
+la feuille, poser la règle, verser un sachet. Moche par endroits, mais entier.
 
-Reste à faire :
-
-- **`Progression`** (pièces obtenues, résolutions courantes, budget, carnet), volontairement
-  limité à ces quatre responsabilités.
-- **Le carnet** : lois rencontrées et formes mathématiques, signalées à la troisième
-  apparition dans un contexte physique différent — jamais avant trois.
-- **La commande de diagnostic** du graphe des lois : vérifier que toute grandeur cible est
-  atteignable par au moins deux chemins distincts, en remontant jusqu'aux primitives brutes.
-- **La machine 2** (bouilloire, calorimétrie, même forme linéaire), qui est le test
-  d'acceptance du socle.
-
-### Défaut structurel connu
-
-`Primitive.pas` est un scalaire unique, et c'est faux. « Éclairer / voir » mesure une longueur
-*et* un volume — deux unités, donc deux résolutions. Un seul `pas` ne peut pas servir les
-deux. Le correctif est `pas_par_grandeur: Dictionary` et un `GenerateurMesure.mesurer()` qui
-prend la grandeur mesurée ; il touche les huit `.tres` de primitives et deux fichiers de
-simulation. La machine 2 bute dessus — à corriger avant de l'écrire.
-
-### Questions ouvertes
-
-- L'annexe C liste `instrument` comme prérequis de six lois, mais `instrument` n'est pas une
-  des huit primitives : c'est une pièce fabriquée. D'où le champ `outils_requis` plutôt que
-  `primitives_requises`. Reste à trancher : un seul outil générique, ou plusieurs distincts
-  (voltmètre, manomètre) ?
-- Les lois `PARTIELLE` (systèmes à plusieurs inconnues) et les lois qui **changent de forme
-  selon la variable observée** (Beer-Lambert, linéaire en concentration et exponentielle en
-  épaisseur) ont leurs champs prévus mais pas de mécanique conçue. Volontairement reporté à
-  la première machine concrète de chaque type, plutôt que deviné à l'avance.
+C'est encore un prototype et il reste jetable. Il n'y a **pas** de progression, pas de
+carnet, pas de niveau 2, pas de kit générique, et rien qui enregistre ce que le joueur a
+produit.
