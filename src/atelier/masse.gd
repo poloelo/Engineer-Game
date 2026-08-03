@@ -23,10 +23,14 @@ var rayon: float = 11.0
 var crochet: bool = false
 ## Un contenant qu'on remplit. Sa masse est sa tare plus son contenu.
 var sachet: bool = false
+## Un etalon porte sa valeur gravee en relief : presse contre le papier, il y
+## laisse son chiffre. C'est le seul moyen d'annoter une marque, et sans lui les
+## traits du cadran sont anonymes.
+var poincon: bool = false
 ## Ce qu'il y a dedans, en grammes.
 var contenu_g: float = 0.0
 ## Ce que peut contenir un sachet, en grammes. Au-dela, ca deborde.
-var capacite_g: float = 180.0
+var capacite_g: float = 165.0
 ## La masse a vide, relevee a la construction.
 var tare_g: float = 0.0
 var accrochee: bool = false

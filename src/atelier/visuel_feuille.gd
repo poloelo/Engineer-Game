@@ -21,7 +21,6 @@ const PAS_QUADRILLAGE: float = 10.0
 const MARGE_PATCH: int = 24
 
 var taille: Vector2 = Vector2(330.0, 235.0)
-var attrapee: bool = false
 
 var _patch: NinePatchRect = null
 
@@ -48,11 +47,11 @@ func _ready() -> void:
 func _draw() -> void:
 	var cadre: Rect2 = Rect2(Vector2.ZERO, taille)
 	if _patch != null:
-		draw_rect(cadre, BORD, false, 0.75 if attrapee else 0.5)
+		draw_rect(cadre, BORD, false, 0.5)
 		return
 
 	draw_rect(cadre, PAPIER, true)
-	draw_rect(cadre, BORD, false, 0.75 if attrapee else 0.5)
+	draw_rect(cadre, BORD, false, 0.5)
 
 	# Un quadrillage tres pale : de quoi situer une trace sans rien mesurer.
 	var x: float = PAS_QUADRILLAGE

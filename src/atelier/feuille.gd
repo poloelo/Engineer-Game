@@ -34,7 +34,6 @@ const RESOLUTION: float = 6.0
 
 var _faces: Array[Node] = []
 var _face: int = 0
-var _attrapee: bool = false
 var _visuel: Node2D = null
 ## Index des points d'encre par face, en mm locaux, pour l'aimant de la regle.
 var _index: Array[PackedVector2Array] = [PackedVector2Array(), PackedVector2Array()]
@@ -60,19 +59,24 @@ func rect() -> Rect2:
 	return Rect2(Vector2.ZERO, TAILLE)
 
 
-func attraper(ou: Vector2) -> bool:
-	if not rect().has_point(to_local(ou)):
-		return false
-	_attrapee = true
-	_visuel.attrapee = true
-	_visuel.queue_redraw()
-	return true
+## La feuille NE COULISSE PAS. Elle est punaisee et elle le reste : chaque etalon
+## accroche laisse sa marque a une hauteur differente, toutes sur la meme
+## verticale. Ce n'est pas un nuage de points, c'est un cadran — c'est exactement
+## comme ca qu'on gradue un peson reel, et c'est ce qui rend le versage lisible
+## sans regle ni calcul.
+func contient(monde: Vector2) -> bool:
+	return rect().has_point(to_local(monde))
 
 
-func relacher() -> void:
-	_attrapee = false
-	_visuel.attrapee = false
-	_visuel.queue_redraw()
+## Le coup de poincon d'un etalon presse contre le papier : son chiffre reste
+## grave a cote de sa marque. Sans ca les traits sont anonymes et le releve n'est
+## pas une mesure.
+func tamponner(monde: Vector2, texte: String, hauteur_mm: float = 7.0) -> void:
+	if not contient(monde):
+		return
+	var local: Vector2 = to_local(monde)
+	_faces[_face].graver(local, texte, hauteur_mm)
+	_index[_face].append(local)
 
 
 ## Depose un point sous la pointe, si elle touche le papier.

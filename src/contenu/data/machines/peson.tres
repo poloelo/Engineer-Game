@@ -8,10 +8,8 @@
 script = ExtResource("3_mm56y")
 id = &"peson"
 titre = "Le peson"
-symptome = "La balance de l'atelier a un pas de 100 g. Elle ne bouge pas."
 loi_cachee = ExtResource("1_yqodh")
 parametres_caches = {}
 grandeur_lue = &"longueur"
 grandeur_produite = &"masse"
-etalons = Array[float]([5.0, 10.0, 25.0, 50.0, 100.0, 200.0, 500.0])
 primitive_lue = ExtResource("2_xvgr7")
