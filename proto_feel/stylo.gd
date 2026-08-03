@@ -1,22 +1,24 @@
-# Le stylo. Trois etats : pose sur l'etabli, tenu a la main, clipse sur un
-# element mobile.
+# Le stylo : la COUCHE FORME. Trois etats — pose sur l'etabli, tenu a la main,
+# clipse sur un marqueur.
 #
 # Clipse au crochet avec la pointe baissee, il trace la trajectoire de ce a quoi
 # il est attache — un point par masse ajoutee, ou toute la courbe d'une
 # oscillation. Aucun cas particulier : c'est la meme pointe qui touche la meme
 # feuille.
+#
+# La pointe est un Marker2D : c'est lui que la feuille recoit, et il se deplace
+# dans l'editeur sans qu'une position soit ecrite en dur nulle part.
 extends Node2D
 
-const CORPS: Color = Color("e6f0f8")
-const ENCRE: Color = Color("ffd9a0")
-const VISE: Color = Color("ffb454")
-const LEVE: Color = Color(0.90, 0.94, 0.97, 0.35)
+const Marqueurs: GDScript = preload("res://marqueurs.gd")
+const VisuelStylo: GDScript = preload("res://visuel_stylo.gd")
 
-const LONGUEUR: float = 58.0
-const LARGEUR: float = 9.0
-## De combien la pointe descend quand on la baisse. C'est le geste explicite :
-## on ne trace pas en permanence.
-const COURSE_POINTE: float = 9.0
+## Longueur du corps, en mm.
+const LONGUEUR: float = 29.0
+const LARGEUR: float = 4.5
+## De combien la pointe descend quand on la baisse, en mm. C'est le geste
+## explicite : on ne trace pas en permanence.
+const COURSE_POINTE: float = 4.5
 
 var tenu: bool = false
 var pointe_baissee: bool = false
@@ -26,20 +28,42 @@ var decalage: Vector2 = Vector2.ZERO
 ## Vrai quand lacher maintenant le clipserait quelque part.
 var vise: bool = false
 
+var _visuel: Node2D = null
+var _pointe: Marker2D = null
+
+
+func _ready() -> void:
+	_pointe = Marqueurs.poser(self, "pointe", Vector2(0.0, LONGUEUR * 0.5), Marqueurs.POINTE)
+
+	_visuel = VisuelStylo.new()
+	_visuel.longueur = LONGUEUR
+	_visuel.largeur = LARGEUR
+	_visuel.course = COURSE_POINTE
+	add_child(_visuel)
+	_rafraichir()
+
 
 func attraper(ou: Vector2) -> bool:
 	if to_local(ou).length() > LONGUEUR * 0.75:
 		return false
 	tenu = true
 	declipser()
-	queue_redraw()
+	_rafraichir()
 	return true
 
 
 func relacher() -> void:
 	tenu = false
 	vise = false
-	queue_redraw()
+	_rafraichir()
+
+
+## Ou le stylo se clipserait si on lachait maintenant.
+func definir_vise(valeur: bool) -> void:
+	if valeur == vise:
+		return
+	vise = valeur
+	_rafraichir()
 
 
 func clipser(sur: Node2D) -> void:
@@ -47,59 +71,29 @@ func clipser(sur: Node2D) -> void:
 	# On garde l'ecart courant : le stylo reste ou le joueur l'a pose, il ne
 	# saute pas au centre de la masse.
 	decalage = global_position - sur.global_position
-	queue_redraw()
+	_rafraichir()
 
 
 func declipser() -> void:
 	support = null
-	queue_redraw()
+	_rafraichir()
 
 
 func basculer_pointe() -> void:
 	pointe_baissee = not pointe_baissee
-	queue_redraw()
+	_pointe.position = Vector2(0.0, LONGUEUR * 0.5 + (COURSE_POINTE if pointe_baissee else 0.0))
+	_rafraichir()
 
 
 ## Ou l'encre touche le papier.
 func pointe() -> Vector2:
-	var course: float = COURSE_POINTE if pointe_baissee else 0.0
-	return global_position + Vector2(0.0, LONGUEUR * 0.5 + course)
+	return _pointe.global_position
 
 
-func _draw() -> void:
-	var couleur: Color = VISE if vise else CORPS
-	var demi: float = LONGUEUR * 0.5
-	var course: float = COURSE_POINTE if pointe_baissee else 0.0
-
-	# Le corps, un simple rectangle incline de rien du tout.
-	draw_rect(
-		Rect2(Vector2(-LARGEUR * 0.5, -demi), Vector2(LARGEUR, LONGUEUR * 0.78)),
-		couleur,
-		false,
-		1.8
-	)
-	# La bague, qui marque la separation corps / pointe.
-	draw_line(
-		Vector2(-LARGEUR * 0.7, demi * 0.56),
-		Vector2(LARGEUR * 0.7, demi * 0.56),
-		couleur,
-		2.0
-	)
-	# Le cone de la pointe, qui sort quand elle est baissee.
-	var bout: Vector2 = Vector2(0.0, demi + course)
-	draw_polyline(
-		PackedVector2Array([
-			Vector2(-LARGEUR * 0.5, demi * 0.56),
-			bout,
-			Vector2(LARGEUR * 0.5, demi * 0.56),
-		]),
-		ENCRE if pointe_baissee else LEVE,
-		1.8
-	)
-	if pointe_baissee:
-		draw_circle(bout, 2.4, ENCRE)
-
-	# Le clip, qui montre a quoi il est attache.
-	if support != null and is_instance_valid(support):
-		draw_arc(Vector2(0.0, -demi + 6.0), 7.0, 0.0, TAU, 16, VISE, 1.6)
-		draw_line(Vector2.ZERO, to_local(support.global_position), VISE.darkened(0.4), 1.0)
+func _rafraichir() -> void:
+	if _visuel == null:
+		return
+	_visuel.pointe_baissee = pointe_baissee
+	_visuel.vise = vise
+	_visuel.support = support
+	_visuel.queue_redraw()
