@@ -50,10 +50,12 @@ func test_mesure_deterministe() -> void:
 
 
 func test_releves_accumules() -> void:
+	# Les etalons sont ceux de l'atelier, qui fait foi pour l'instant : la
+	# definition de machine ne les porte plus, elle ne decrit que la physique.
 	var simulation: SimulationMachine = _simulation()
-	for etalon: float in _machine().etalons:
+	for etalon: float in [10.0, 20.0, 50.0, 100.0]:
 		simulation.effectuer_mesure(simulation.etat_pour_etalon(etalon))
-	verifier_egal(simulation.releves().size(), 7, "un point par etalon")
+	verifier_egal(simulation.releves().size(), 4, "un point par etalon")
 
 
 func test_precision_amelioree_est_injectee() -> void:

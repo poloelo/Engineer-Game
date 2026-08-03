@@ -11,13 +11,18 @@ const BORD: Color = Color(0.90, 0.94, 0.97, 0.38)
 const ENCRE: Color = Color(0.94, 0.97, 1.0, 0.92)
 const EFFACE: Color = Color(0.90, 0.94, 0.97, 0.45)
 const PUNAISE: Color = Color(0.90, 0.94, 0.97, 0.55)
+const SOLDE: Color = Color("ffb454")
 
 const TAILLE: Vector2 = Vector2(120.0, 86.0)
 ## On grave grand puis on reduit : le texte reste net sous la loupe.
 const RASTER: int = 48
 
-## Les trois sachets a produire, en grammes.
+## Les trois sachets a produire, en grammes. C'est la seule source de verite de
+## la commande : le plateau s'y refere pour savoir si elle est honoree.
 const COMMANDE: Array[float] = [56.0, 89.0, 143.0]
+
+## Vrai quand les trois sachets sont sur le plateau, aux tolerances pres.
+var honore: bool = false
 
 
 func _draw() -> void:
@@ -34,6 +39,13 @@ func _draw() -> void:
 		_ecrire(police, "poudre", Vector2(9.0, y), 6.0, EFFACE)
 		_ecrire(police, "%d g" % int(grammes), Vector2(TAILLE.x - 40.0, y), 8.0, ENCRE)
 		y += 17.0
+
+	if not honore:
+		return
+	# La commande honoree est barree d'un coup de tampon. Pas un pourcentage, pas
+	# un « bravo » : le bon est solde, comme sur un etabli.
+	draw_line(Vector2(12.0, TAILLE.y - 14.0), Vector2(TAILLE.x - 12.0, 30.0), SOLDE, 2.2)
+	draw_rect(Rect2(Vector2.ZERO, TAILLE), SOLDE, false, 1.4)
 
 
 ## Ecrit un texte dont la hauteur est donnee en mm de monde.

@@ -24,9 +24,14 @@ const LARGEUR: float = 34.0
 const ANGLE_MAX: float = 2.1
 ## Au-dela de cet angle, ca coule.
 const ANGLE_VERSAGE: float = 0.62
-## Debit, en g/s. Assez lent pour viser une graduation, assez vif pour ne pas
-## attendre.
-const DEBIT: float = 55.0
+## Debit selon l'inclinaison, en g/s. C'est ce qui rend la tolerance de 2 g
+## atteignable : a debit constant, les 100 ms de reflexe du joueur coutent 5 g de
+## depassement et aucune visee n'est possible. Penche a fond on remplit vite,
+## penche juste au-dessus du seuil on fait couler un filet et on ajuste au gramme.
+##
+## C'est aussi ce que fait un vrai pot : on redresse pour finir.
+const DEBIT_MIN: float = 2.0
+const DEBIT_MAX: float = 70.0
 ## Ecart horizontal tolere entre le goulot et la bouche visee, en mm. La poudre
 ## tombe droit : il faut mettre le bec au-dessus du sac, pas a cote.
 const LARGEUR_FILET: float = 24.0
@@ -37,8 +42,12 @@ const CHUTE_MAX: float = 260.0
 
 enum Prise { AUCUNE, CORPS, POIGNEE }
 
-## Ce qui reste dans le pot, en grammes. Large : le joueur a droit a l'erreur.
-var reste_g: float = 900.0
+## Contenance du pot, en grammes. Large : le joueur a droit a l'erreur, et il
+## renverse forcement de la poudre en apprenant a doser.
+const CONTENANCE: float = 900.0
+
+## Ce qui reste dans le pot, en grammes.
+var reste_g: float = CONTENANCE
 var prise: int = Prise.AUCUNE
 var survol: int = Prise.AUCUNE
 
@@ -107,9 +116,18 @@ func coule() -> bool:
 	return _angle > ANGLE_VERSAGE and reste_g > 0.0
 
 
+## Debit courant, en g/s. Quadratique en l'inclinaison : le filet reste fin sur
+## une large plage d'angle, ce qui laisse de la place pour doser.
+func debit() -> float:
+	var part: float = clampf(
+		(_angle - ANGLE_VERSAGE) / maxf(ANGLE_MAX - ANGLE_VERSAGE, 0.001), 0.0, 1.0
+	)
+	return DEBIT_MIN + (DEBIT_MAX - DEBIT_MIN) * part * part
+
+
 ## Prend dans le pot ce qui doit s'ecouler pendant [param delta].
 func prelever(delta: float) -> float:
-	var sorti: float = minf(DEBIT * delta, reste_g)
+	var sorti: float = minf(debit() * delta, reste_g)
 	reste_g -= sorti
 	return sorti
 
@@ -136,7 +154,7 @@ func _draw() -> void:
 
 	# Le niveau de poudre restante, a plat dans le repere du pot.
 	if reste_g > 0.0:
-		var part: float = clampf(reste_g / 900.0, 0.0, 1.0)
+		var part: float = clampf(reste_g / CONTENANCE, 0.0, 1.0)
 		var niveau: float = lerpf(demi_h, -demi_h * 0.7, part)
 		draw_colored_polygon(
 			PackedVector2Array([

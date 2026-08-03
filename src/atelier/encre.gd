@@ -24,6 +24,8 @@ class Trait:
 
 	var epaisseur: float = 5.0
 	var en_attente: Array[PackedVector2Array] = []
+	## Les chiffres tamponnes, en attente d'etre graves une fois pour toutes.
+	var gravures: Array[Dictionary] = []
 
 	func _draw() -> void:
 		for segment: PackedVector2Array in en_attente:
@@ -33,6 +35,25 @@ class Trait:
 			else:
 				draw_polyline(segment, COULEUR, epaisseur, true)
 		en_attente.clear()
+
+		var police: Font = ThemeDB.fallback_font
+		for gravure: Dictionary in gravures:
+			var texte: String = String(gravure["texte"])
+			var taille: int = int(gravure["taille"])
+			var largeur: float = police.get_string_size(
+				texte, HORIZONTAL_ALIGNMENT_LEFT, -1, taille
+			).x
+			var ou: Vector2 = gravure["position"]
+			draw_string(
+				police,
+				ou - Vector2(largeur * 0.5, 0.0),
+				texte,
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1,
+				taille,
+				COULEUR
+			)
+		gravures.clear()
 
 
 var taille_mm: Vector2 = Vector2(330.0, 235.0)
@@ -95,6 +116,20 @@ func poser(local_mm: Vector2, pas: float) -> bool:
 	_trait.queue_redraw()
 	_vue.render_target_update_mode = SubViewport.UPDATE_ONCE
 	return true
+
+
+## Grave un chiffre a demeure, comme un coup de poincon. [param hauteur_mm] est
+## la hauteur du chiffre sur le papier, en mm.
+func graver(local_mm: Vector2, texte: String, hauteur_mm: float) -> void:
+	_trait.gravures.append({
+		"position": local_mm * resolution,
+		"texte": texte,
+		# La cible de rendu est en pixels de texture : la police s'y rasterise a
+		# sa taille finale, donc rien a mettre a l'echelle apres coup.
+		"taille": int(hauteur_mm * resolution),
+	})
+	_trait.queue_redraw()
+	_vue.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 ## La pointe se leve : le trait suivant repartira ailleurs, sans relier les deux.

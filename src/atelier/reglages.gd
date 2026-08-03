@@ -27,11 +27,14 @@ static var ECHELLE_TEMPS: float = 1.0
 ## Longueur du ressort sans rien accroche, en mm.
 static var LONGUEUR_REPOS: float = 48.0
 
-## Raideur, en g/s2 (9600 g/s2 = 9,6 N/m). Elle est fixee par la commande du
-## niveau 1 : il faut que 143 g de poudre tiennent sur l'etabli sans que le
-## ressort touche le plan de travail. 100 g suspendus l'allongent de 102 mm, et
-## la course utile du cadran fait 146 mm pour 0 a 143 g.
-static var RAIDEUR: float = 9600.0
+## Raideur, en g/s2. Calee sur exactement 9810 = g, ce qui donne UN MILLIMETRE
+## PAR GRAMME : 150 g font 150 mm de course, et 2 g de tolerance font 2 mm, donc
+## une lecture franche a l'oeil nu.
+##
+## Un vrai ressort de peson est cinq fois plus raide et son cadran est illisible.
+## C'est l'exageration que le document reclame explicitement : le plaisir contre
+## la rigueur. Ne pas raidir sans refaire le calcul de lisibilite.
+static var RAIDEUR: float = 9810.0
 
 ## Masse totale du fil du ressort, en g. Elle sert deux fois, et pas avec le meme
 ## coefficient — c'est le resultat classique du ressort pesant :
@@ -57,7 +60,7 @@ static var AMORTISSEMENT: float = 61.0
 static var AMORTISSEMENT_LATERAL: float = 2.0
 
 ## Amortissement quand la butee est rabattue. Doit etre assez haut pour figer net.
-static var AMORTISSEMENT_BUTEE: float = 304.0
+static var AMORTISSEMENT_BUTEE: float = 307.0
 
 ## Amplitude d'oscillation restante, en mm, en dessous de laquelle le ressort se
 ## pose franchement. Sans ce seuil il fremit indefiniment, ce qui est

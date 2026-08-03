@@ -4,14 +4,18 @@
 # l'atelier a un pas de 100 g, elle ne sert a rien. Le joueur a un ressort, un
 # crochet, des masses etalons, un stylo, une feuille, une regle et une loupe.
 #
-# Il clipse le stylo au crochet, accroche un etalon, marque. Il recommence avec
-# d'autres etalons en decalant la feuille. Il pose sa regle sur les marques,
-# constate qu'elles sont regulierement espacees, subdivise pour fabriquer les
-# graduations qui lui manquent — puis il verse la poudre jusqu'a sa propre
-# marque.
+# Il clipse le stylo au crochet et marque son zero — crochet nu, rien accroche.
+# Il accroche un etalon, marque, presse l'etalon contre le papier pour graver son
+# chiffre a cote du trait. Il recommence. LA FEUILLE NE BOUGE PAS : les marques
+# s'empilent sur une meme verticale et forment un cadran, pas un nuage de points.
+#
+# Verser jusqu'a une marque ne demande alors ni regle ni calcul. La regle et le
+# compas ne servent qu'a fabriquer les graduations qui manquent — 56, 89, 143 —
+# c'est-a-dire la ou le geste mathematique compte vraiment.
 #
 # Le livrable du niveau n'est pas une equation. C'est un cadran gradue a la main,
-# et trois sachets produits. Rien ici ne verifie ce qui sort, rien ne note.
+# et trois sachets poses sur le plateau. Rien n'affiche de pourcentage : le
+# verdict, c'est ce qui est sur la table.
 #
 # TOUT EST EN MILLIMETRES, GRAMMES ET SECONDES. Pas une ligne de ce fichier ne
 # connait le pixel : la seule mention de l'ecran est le zoom de la Camera2D,
@@ -39,6 +43,7 @@ const Regle: GDScript = preload("res://src/atelier/regle.gd")
 const Loupe: GDScript = preload("res://src/atelier/loupe.gd")
 const Verseuse: GDScript = preload("res://src/atelier/verseuse.gd")
 const Enonce: GDScript = preload("res://src/atelier/enonce.gd")
+const Plateau: GDScript = preload("res://src/atelier/plateau.gd")
 const VisuelEtabli: GDScript = preload("res://src/atelier/visuel_etabli.gd")
 const VisuelRessort: GDScript = preload("res://src/atelier/visuel_ressort.gd")
 const PanneauReglages: GDScript = preload("res://src/atelier/panneau_reglages.gd")
@@ -60,11 +65,23 @@ const LONGUEUR_MIN: float = 12.0
 
 ## Le jeu de masses d'etalonnage, en grammes.
 ##
-## Quatre valeurs rondes, accrochees UNE A LA FOIS. Leurs marques tombent
-## regulierement espacees sur la feuille — c'est ce constat qui autorise le joueur
-## a subdiviser entre deux marques. Et aucune ne vaut 56, 89 ni 143 : il ne peut
-## pas se contenter de les recopier.
-const MASSES_G: Array[float] = [20.0, 50.0, 100.0, 150.0]
+## INVARIANT FATAL, ET INVISIBLE SI ON LE CASSE : aucune ligne du bon de travail
+## ne doit etre atteignable en additionnant des etalons. Avec 10/20/50/100 les
+## sommes possibles sont 0, 10, 20, 30, 50, 60, 70, 80, 100, 110, 120, 130, 150,
+## 160, 170, 180 — ni 56, ni 89, ni 143 n'y sont.
+##
+## Un seul etalon de plus peut tuer le niveau sans que rien ne le signale : 6 g
+## donnerait 56, 39 g donnerait 89, 43 g donnerait 143. Le joueur poserait alors
+## la bonne masse au lieu de graduer son cadran, et le niveau n'aurait plus de
+## sujet. VERIFIER TOUTES LES SOMMES AVANT DE TOUCHER A CETTE LISTE.
+##
+## Le 10 g est indispensable : c'est lui qui permet de construire des graduations
+## fines entre deux marques larges.
+const MASSES_G: Array[float] = [10.0, 20.0, 50.0, 100.0]
+
+## Tolerance d'acceptation d'un sachet, en grammes. A un millimetre par gramme,
+## 2 g valent 2 mm sur le cadran : c'est lisible a l'oeil, serre a verser.
+const TOLERANCE_G: float = 2.0
 
 ## Masse a vide d'un sachet, en grammes. Elle pese, comme le crochet : c'est le
 ## meme piege, une deuxieme fois.
@@ -72,6 +89,12 @@ const TARE_SACHET: float = 12.0
 
 ## Nombre de sachets fournis : autant que la commande en demande.
 const SACHETS: int = 3
+
+## Duree de pression d'un poincon contre le papier avant qu'il marque, en s.
+const DUREE_TAMPON: float = 0.45
+## Vitesse du curseur en dessous de laquelle on considere qu'on appuie, en mm/s.
+## Au-dessus, on est en train de deplacer la masse, pas de tamponner.
+const VITESSE_TAMPON: float = 22.0
 
 # --- Etat du ressort, libre dans le plan -------------------------------------
 
@@ -95,6 +118,8 @@ var _loupe: Node2D = null
 var _ressort: Line2D = null
 var _bout_ressort: Marker2D = null
 var _verseuse: Node2D = null
+var _plateau: Node2D = null
+var _enonce: Node2D = null
 
 # --- Saisie ------------------------------------------------------------------
 
@@ -109,6 +134,12 @@ var _outil_saisi: Node2D = null
 var _clipsage_vise: RigidBody2D = null
 ## La bouche vers laquelle la poudre coule en ce moment, pour dessiner le filet.
 var _cible_versage: Marker2D = null
+## Ou la poudre deborde d'un sachet plein, pour que ca se voie.
+var _debordement: Vector2 = Vector2.INF
+## Duree de pression accumulee du poincon contre le papier, en secondes.
+var _pression: float = 0.0
+var _tampon_pose: bool = false
+var _cible_precedente: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -204,10 +235,16 @@ func _construire_instruments() -> void:
 	_loupe.z_index = 12
 	add_child(_loupe)
 
-	var enonce: Node2D = Enonce.new()
-	enonce.position = Vector2(10.0, 46.0)
-	enonce.z_index = -6
-	add_child(enonce)
+	_enonce = Enonce.new()
+	_enonce.position = Vector2(10.0, 40.0)
+	_enonce.z_index = -6
+	add_child(_enonce)
+
+	# Le plateau de livraison : la fin de la boucle, posee sur l'etabli.
+	_plateau = Plateau.new()
+	_plateau.position = Vector2(10.0, 218.0)
+	_plateau.z_index = -5
+	add_child(_plateau)
 
 
 ## Le crochet est une piece reelle du montage, pas un poids indetachable ajoute
@@ -230,8 +267,10 @@ func _construire_masses() -> void:
 	var rang: int = 0
 	for m: float in MASSES_G:
 		var rayon: float = _rayon_de(m)
-		# Un rang suffit pour quatre poids ; le second rang reste au cas ou.
-		_nouvelle_masse(m, rayon, Vector2(x, SOL - rayon - 1.0 - float(rang) * 60.0))
+		# Sa valeur est gravee en relief : presse contre le papier, il la tamponne.
+		_nouvelle_masse(
+			m, rayon, Vector2(x, SOL - rayon - 1.0 - float(rang) * 60.0), false, false, true
+		)
 		x += rayon * 2.0 + 6.0
 		if x > 625.0:
 			x = 420.0
@@ -270,7 +309,8 @@ func _nouvelle_masse(
 	rayon: float,
 	ou: Vector2,
 	est_crochet: bool = false,
-	est_sachet: bool = false
+	est_sachet: bool = false,
+	est_poincon: bool = false
 ) -> RigidBody2D:
 	var corps: RigidBody2D = Masse.new()
 	corps.rayon = rayon
@@ -278,6 +318,7 @@ func _nouvelle_masse(
 	corps.position = ou
 	corps.crochet = est_crochet
 	corps.sachet = est_sachet
+	corps.poincon = est_poincon
 	add_child(corps)
 	_libres.append(corps)
 	return corps
@@ -301,7 +342,10 @@ func _physics_process(delta: float) -> void:
 	_detecter_aimantation()
 	_detecter_chocs()
 	_verser(delta)
+	_plateau.maintenir()
+	_presser_le_poincon(delta)
 	_animer_stylo()
+	_cible_precedente = _cible
 
 	_butee_angle = lerpf(_butee_angle, -1.15 if _butee else 0.0, 1.0 - pow(0.001, delta))
 	queue_redraw()
@@ -494,15 +538,20 @@ func _detecter_chocs() -> void:
 ## pend a la chaine, le ressort s'allonge tout seul pendant qu'il se remplit.
 func _verser(delta: float) -> void:
 	_cible_versage = null
+	_debordement = Vector2.INF
 	if _verseuse == null or not _verseuse.coule():
 		return
 	var bouche: Marker2D = _bouche_sous_le_bec(_verseuse.goulot())
 	if bouche == null:
 		return
 	_cible_versage = bouche
-	# Ce qui sort du pot ne rentre pas forcement : un sachet plein deborde, et ce
-	# qui deborde est perdu. On ne le recupere pas.
-	bouche.get_parent().call("remplir", _verseuse.prelever(delta))
+	# Ce qui sort du pot ne rentre pas forcement. Un sachet plein deborde, et ca
+	# DOIT se voir : sinon la poudre disparait en silence et le joueur croit
+	# remplir alors qu'il gaspille.
+	var sorti: float = _verseuse.prelever(delta)
+	var entre: float = float(bouche.get_parent().call("remplir", sorti))
+	if sorti - entre > 0.0001:
+		_debordement = bouche.global_position
 
 
 ## La bouche qui se trouve SOUS le bec, et la plus proche. La poudre tombe droit :
@@ -520,6 +569,45 @@ func _bouche_sous_le_bec(goulot: Vector2) -> Marker2D:
 		chute = ecart.y
 		meilleure = bouche
 	return meilleure
+
+
+# --- Poincon -----------------------------------------------------------------
+
+
+## Presser un etalon contre le papier y grave son chiffre.
+##
+## Le geste est celui d'un tampon : on amene la masse sur le papier et on APPUIE,
+## c'est-a-dire qu'on arrete de bouger. Il fallait un geste qui ne se declenche
+## pas quand on pose simplement un poids sur la feuille en passant — d'ou le seuil
+## de vitesse et le temps de pression, et l'arc qui se remplit pour qu'on voie
+## venir la marque au lieu de la subir.
+##
+## Sans ce tampon les traits du cadran sont anonymes : trois traits sur un papier,
+## rien ne dit lequel est le 50. Un releve sans annotation n'est pas une mesure.
+func _presser_le_poincon(delta: float) -> void:
+	if _saisie == null or _saisie_index >= 0 or not _saisie.poincon:
+		_pression = 0.0
+		_tampon_pose = false
+		return
+
+	var vitesse: float = (_cible - _cible_precedente).length() / maxf(delta, 0.0001)
+	if not _feuille.contient(_saisie.global_position) or vitesse > VITESSE_TAMPON:
+		_pression = 0.0
+		_tampon_pose = false
+		return
+	if _tampon_pose:
+		return
+
+	_pression += delta
+	if _pression < DUREE_TAMPON:
+		return
+	# Le chiffre se pose a cote de la masse, pas dessous : on doit pouvoir viser
+	# le trait avec le bord du poincon et lire le chiffre a cote.
+	_feuille.tamponner(
+		_saisie.global_position + Vector2(_saisie.rayon + 6.0, 2.5),
+		"%d" % int(round(_saisie.mass))
+	)
+	_tampon_pose = true
 
 
 # --- Stylo -------------------------------------------------------------------
@@ -657,6 +745,9 @@ func _saisir(ou: Vector2) -> void:
 	for i: int in range(_libres.size() - 1, -1, -1):
 		var corps: RigidBody2D = _libres[i]
 		if ou.distance_to(corps.global_position) < corps.rayon + 3.0:
+			# Un sachet mal dose se reprend sur le plateau et se corrige.
+			if _plateau.retirer(corps):
+				_evaluer_commande()
 			_saisie = corps
 			_saisie_index = -1
 			_offset_saisie = ou - corps.global_position
@@ -667,10 +758,6 @@ func _saisir(ou: Vector2) -> void:
 			corps.linear_velocity *= 0.2
 			corps.angular_velocity *= 0.2
 			return
-
-	if _feuille.attraper(ou):
-		_outil_saisi = _feuille
-		_offset_saisie = ou - _feuille.global_position
 
 
 func _lacher() -> void:
@@ -694,7 +781,34 @@ func _lacher() -> void:
 	corps.rafraichir()
 	if _aimant_actif:
 		_accrocher(corps)
+		_aimant_actif = false
+		return
 	_aimant_actif = false
+	_livrer(corps)
+
+
+## Un sachet lache au-dessus d'un creux libre s'y depose. C'est toute la
+## ceremonie de livraison : pas de bouton, pas de confirmation, on pose.
+func _livrer(corps: RigidBody2D) -> void:
+	if not corps.sachet:
+		return
+	# On juge sur le POINTEUR, pas sur le sachet : un sachet plein traine loin
+	# derriere le curseur, et le tester lui ferait rater le creux que le joueur
+	# vise. C'est la meme raison qu'a l'aimantation du crochet.
+	var creux: int = _plateau.creux_libre(_cible - _offset_saisie)
+	if creux < 0:
+		return
+	_plateau.deposer(corps, creux)
+	_evaluer_commande()
+
+
+## La commande est-elle honoree ? Rien ne s'affiche tant qu'elle ne l'est pas :
+## pas de verdict ligne par ligne, pas de « faux ». Quand les trois sachets y
+## sont, le plateau et le bon de travail le montrent, et c'est tout.
+func _evaluer_commande() -> void:
+	var honore: bool = _plateau.evaluer(Enonce.COMMANDE, TOLERANCE_G)
+	_enonce.honore = honore
+	_enonce.queue_redraw()
 
 
 func _ranger() -> void:
@@ -729,8 +843,6 @@ func _process(_delta: float) -> void:
 			_verseuse.incliner(ou)
 	elif _outil_saisi == _loupe:
 		_loupe.global_position = ou - _offset_saisie
-	elif _outil_saisi == _feuille:
-		_feuille.global_position = ou - _offset_saisie
 	elif _outil_saisi == _stylo:
 		# Ou le stylo se clipsera si on lache maintenant.
 		_clipsage_vise = _cible_de_clipsage(ou)
@@ -739,6 +851,12 @@ func _process(_delta: float) -> void:
 	_regle.definir_survol(ou)
 	_loupe.definir_survol(ou)
 	_verseuse.definir_survol(ou)
+
+	# Le creux ou le sachet tenu tomberait si on lachait maintenant.
+	var vise: int = -1
+	if _saisie != null and _saisie_index < 0 and _saisie.sachet:
+		vise = _plateau.creux_libre(ou - _offset_saisie)
+	_plateau.definir_vise(vise)
 
 
 ## Le marqueur porte-stylo le plus proche du pointeur, dans le rayon de clipsage.
@@ -766,6 +884,27 @@ func _draw() -> void:
 		draw_arc(
 			_clipsage_vise.global_position, _clipsage_vise.rayon + 4.5, 0.0, TAU, 32, PRETE, 0.75
 		)
+	_dessiner_pression()
+	if _debordement != Vector2.INF:
+		# La poudre qui deborde tombe par terre. Elle est perdue, et ca se voit.
+		draw_line(_debordement, Vector2(_debordement.x, SOL), PRETE.darkened(0.45), 1.6)
+
+
+## L'arc qui se remplit pendant qu'on presse un poincon : on voit venir la marque
+## au lieu de la subir, et on peut relever la masse avant qu'elle tombe.
+func _dessiner_pression() -> void:
+	if _pression <= 0.0 or _saisie == null:
+		return
+	var part: float = clampf(_pression / DUREE_TAMPON, 0.0, 1.0)
+	draw_arc(
+		_saisie.global_position,
+		_saisie.rayon + 3.5,
+		-PI * 0.5,
+		-PI * 0.5 + TAU * part,
+		28,
+		PRETE,
+		1.2
+	)
 
 
 func _dessiner_butee() -> void:
