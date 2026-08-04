@@ -1,7 +1,14 @@
-# La regle : la COUCHE FORME. Geometrie, zones de prehension, marqueurs. Un objet
-# pose sur la table, manipule directement : on attrape le corps pour la
-# translater, une extremite pour la faire pivoter autour de l'autre. Aucun bouton,
-# aucun mode, aucun raccourci.
+# La regle : la COUCHE FORME. Geometrie, zones de prehension, marqueurs.
+#
+# DEUX ZONES, DEUX ACTIONS, ET LE SURVOL LE DIT :
+#   - le corps   : on la deplace, et son zero se cale tout seul sur une marque
+#   - la molette : on la fait pivoter autour de ce zero
+# Il y avait avant deux zones de pivot larges de 31 mm a chaque bout, qui
+# ressemblaient au corps : on ne savait pas ce qu'on allait attraper. La molette
+# est ronde, moletee, posee hors du corps — elle ne ressemble a rien d'autre.
+#
+# On ne s'en sert que droite : elle se cale seule sur l'horizontale et la
+# verticale, et il faut forcer pour l'incliner.
 #
 # Son arete de mesure est la ligne y = 0 en repere local : un trait franc, avec
 # les graduations qui en descendent et le corps translucide en dessous. On vise
@@ -13,6 +20,7 @@
 # plus.
 extends Node2D
 
+const Reglages: GDScript = preload("res://src/atelier/reglages.gd")
 const Marqueurs: GDScript = preload("res://src/atelier/marqueurs.gd")
 const VisuelRegle: GDScript = preload("res://src/atelier/visuel_regle.gd")
 
@@ -21,12 +29,13 @@ const LONGUEUR: float = 200.0
 const LARGEUR: float = 22.0
 ## Pas de graduation, en mm. Le millimetre, evidemment.
 const PAS: float = 1.0
-## Zone de prehension a chaque bout, en mm. Large expres : on ne doit pas avoir a
-## viser.
-const ZONE_BOUT: float = 31.0
+## Rayon de la molette de rotation, en mm. Elle deborde du corps, au bout oppose
+## au zero : on pince le zero sur une marque et on fait tourner par l'autre bout.
+const RAYON_MOLETTE: float = 9.5
+## De combien la molette est decalee au-dela du bout de la regle, en mm.
+const RECUL_MOLETTE: float = 11.0
 
-## PIVOT_AUTOUR_FIN : on tient le debut, la regle tourne autour de son autre bout.
-enum Prise { AUCUNE, TRANSLATION, PIVOT_AUTOUR_FIN, PIVOT_AUTOUR_DEBUT }
+enum Prise { AUCUNE, TRANSLATION, PIVOT }
 
 var prise: int = Prise.AUCUNE
 var survol: int = Prise.AUCUNE
@@ -44,6 +53,8 @@ func _ready() -> void:
 	_visuel.longueur = LONGUEUR
 	_visuel.largeur = LARGEUR
 	_visuel.pas = PAS
+	_visuel.rayon_molette = RAYON_MOLETTE
+	_visuel.recul_molette = RECUL_MOLETTE
 	add_child(_visuel)
 	_rafraichir()
 
@@ -64,17 +75,25 @@ func zero() -> Vector2:
 	return Marqueurs.position_de(self, "bord_zero")
 
 
+## La molette, en repere local.
+func molette() -> Vector2:
+	return Vector2(LONGUEUR + RECUL_MOLETTE, LARGEUR * 0.5)
+
+
+## La zone sous un point, sans rien saisir. Sert au curseur.
+func zone_sous(ou: Vector2) -> int:
+	return _zone(ou)
+
+
 func _zone(ou: Vector2) -> int:
 	var local: Vector2 = to_local(ou)
+	# La molette d'abord : c'est la seule zone qui tourne, et elle gagne toujours.
+	if local.distance_to(molette()) <= RAYON_MOLETTE + 2.0:
+		return Prise.PIVOT
 	if local.y < -7.0 or local.y > LARGEUR + 5.0:
 		return Prise.AUCUNE
 	if local.x < -7.0 or local.x > LONGUEUR + 7.0:
 		return Prise.AUCUNE
-	# Un bout fait pivoter autour de l'autre bout.
-	if local.x < ZONE_BOUT:
-		return Prise.PIVOT_AUTOUR_FIN
-	if local.x > LONGUEUR - ZONE_BOUT:
-		return Prise.PIVOT_AUTOUR_DEBUT
 	return Prise.TRANSLATION
 
 
@@ -111,33 +130,29 @@ func deplacer(vers: Vector2, encre: Vector2) -> void:
 	_rafraichir()
 
 
-## Pivot autour du bout oppose a celui qu'on tient. Le point d'appui ne bouge pas.
-func pivoter(vers: Vector2, encre: Vector2) -> void:
-	var cible: Vector2 = vers
-	accroche = Vector2.INF
-	if encre != Vector2.INF:
-		cible = encre
-		accroche = encre
-
-	var appui: Vector2 = fin() if prise == Prise.PIVOT_AUTOUR_FIN else debut()
-	var angle: float = (cible - appui).angle()
-
-	if prise == Prise.PIVOT_AUTOUR_FIN:
-		# On tient le debut. En local, le vecteur appui -> debut vaut (-L, 0),
-		# donc d'angle PI : la rotation est celle du curseur moins PI, et
-		# l'origine se pose au bout du bras, appui compris.
-		rotation = angle - PI
-		global_position = appui + Vector2.from_angle(angle) * LONGUEUR
-	else:
-		# On tient la fin, l'appui est l'origine locale : elle ne bouge pas.
-		rotation = angle
-		global_position = appui
+## Pivot autour du zero, qui ne bouge pas : c'est lui qu'on a cale sur une marque,
+## il n'est pas question qu'il parte.
+##
+## L'angle se cale sur l'horizontale et la verticale des qu'on en approche. On ne
+## se sert de cette regle que droite ; incliner reste possible, mais il faut le
+## vouloir.
+func pivoter(vers: Vector2) -> void:
+	var appui: Vector2 = debut()
+	rotation = _caler_angle((vers - appui).angle())
+	global_position = appui
 	_rafraichir()
 
 
-## Le bout que le curseur tient, en monde — c'est lui qu'on aimante.
-func bout_tenu() -> Vector2:
-	return fin() if prise == Prise.PIVOT_AUTOUR_DEBUT else debut()
+## Ramene un angle sur le quart de tour le plus proche s'il en est assez pres.
+func _caler_angle(angle: float) -> float:
+	var seuil: float = deg_to_rad(Reglages.AIMANT_ANGLE_REGLE)
+	var quart: float = roundf(angle / (PI * 0.5)) * PI * 0.5
+	return quart if absf(angle_difference(angle, quart)) < seuil else angle
+
+
+## Vrai quand la regle est calee sur un quart de tour pile.
+func est_droite() -> bool:
+	return absf(angle_difference(rotation, roundf(rotation / (PI * 0.5)) * PI * 0.5)) < 0.001
 
 
 func _rafraichir() -> void:
@@ -145,4 +160,5 @@ func _rafraichir() -> void:
 		return
 	_visuel.etat = prise if prise != Prise.AUCUNE else survol
 	_visuel.accroche = accroche
+	_visuel.droite = est_droite()
 	_visuel.queue_redraw()

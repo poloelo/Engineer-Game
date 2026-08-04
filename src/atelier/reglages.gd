@@ -25,16 +25,23 @@ static var ECHELLE_TEMPS: float = 1.0
 # --- Ressort -----------------------------------------------------------------
 
 ## Longueur du ressort sans rien accroche, en mm.
-static var LONGUEUR_REPOS: float = 48.0
+static var LONGUEUR_REPOS: float = 40.0
 
-## Raideur, en g/s2. Calee sur exactement 9810 = g, ce qui donne UN MILLIMETRE
-## PAR GRAMME : 150 g font 150 mm de course, et 2 g de tolerance font 2 mm, donc
-## une lecture franche a l'oeil nu.
+## Raideur, en g/s2. Elle donne 1,3728 mm par gramme.
 ##
-## Un vrai ressort de peson est cinq fois plus raide et son cadran est illisible.
-## C'est l'exageration que le document reclame explicitement : le plaisir contre
-## la rigueur. Ne pas raidir sans refaire le calcul de lisibilite.
-static var RAIDEUR: float = 9810.0
+## LA VALEUR NE DOIT PAS ETRE RONDE, ET C'EST LE POINT LE PLUS FRAGILE DU NIVEAU.
+## Calee sur 9810 elle donnait exactement un millimetre par gramme : la regle
+## graduee en millimetres devenait une balance en grammes, le joueur lisait 56 mm
+## au-dessus de son zero et le niveau n'avait plus de contenu. Plus de
+## subdivision, plus d'interpolation, plus de linearite decouverte.
+##
+## A 1,3728 mm/g, un millimetre vaut 0,728 g : ni un sens ni l'autre ne se lit de
+## tete, et il faut vraiment interpoler entre deux marques annotees.
+##
+## Reste lisible : 2 g de tolerance font 2,75 mm, deux etalons voisins (10 g)
+## sont a 13,7 mm l'un de l'autre, et la course de 0 a 143 g fait 196 mm — elle
+## tient tout juste sur la regle de 200.
+static var RAIDEUR: float = 7146.0
 
 ## Masse totale du fil du ressort, en g. Elle sert deux fois, et pas avec le meme
 ## coefficient — c'est le resultat classique du ressort pesant :
@@ -43,16 +50,11 @@ static var RAIDEUR: float = 9810.0
 ## C'est la « masse lineique » du brief, faite au moins cher.
 static var MASSE_RESSORT: float = 18.0
 
-## Masse du crochet, en g. Le piege du niveau 1 tient dans cette valeur : le zero
-## du joueur n'est pas la ou il croit parce que son instrument pese deja.
-## Devissable — retirer le crochet fait remonter le ressort de 30 mm.
-static var MASSE_CROCHET: float = 8.0
-
 ## Amortissement le long de l'axe du ressort : c'est lui qui calme le yoyo.
 ## Applique en racine de la masse, pour que le taux d'amortissement ne depende
 ## pas de la charge — sans quoi une masse lourde revient dans du sirop et une
 ## masse legere claque, avec le meme reglage.
-static var AMORTISSEMENT: float = 61.0
+static var AMORTISSEMENT: float = 52.0
 
 ## Amortissement perpendiculaire a l'axe : c'est lui qui calme le balancement.
 ## En 1/s : la moitie de cette valeur est le taux de decroissance du ballant,
@@ -60,7 +62,7 @@ static var AMORTISSEMENT: float = 61.0
 static var AMORTISSEMENT_LATERAL: float = 2.0
 
 ## Amortissement quand la butee est rabattue. Doit etre assez haut pour figer net.
-static var AMORTISSEMENT_BUTEE: float = 307.0
+static var AMORTISSEMENT_BUTEE: float = 262.0
 
 ## Amplitude d'oscillation restante, en mm, en dessous de laquelle le ressort se
 ## pose franchement. Sans ce seuil il fremit indefiniment, ce qui est
@@ -89,7 +91,11 @@ static var COMPENSATION_POIDS: float = 0.75
 # --- Accrochage --------------------------------------------------------------
 
 ## Rayon de la zone d'aimantation autour du point d'accroche, en mm.
-static var RAYON_AIMANTATION: float = 31.0
+##
+## Resserre : cette zone est prioritaire sur le tampon, et les marques tombent
+## juste au-dessus du point d'accroche. Trop large, elle mangeait la zone ou l'on
+## annote et le joueur ne pouvait plus tamponner ses marques basses.
+static var RAYON_AIMANTATION: float = 20.0
 
 ## Attraction ressentie quand on entre dans la zone, en mm/s2. Met un peu de
 ## colle. Relevee par rapport a l'ancienne valeur : la gravite visible ayant
@@ -129,10 +135,14 @@ static var RAYON_CLIPSAGE: float = 23.0
 ## Bas = trace tres fine mais lourde, haut = trace anguleuse.
 static var PAS_TRACE: float = 0.8
 
-## Distance en dessous de laquelle la regle se cale d'elle-meme sur un trait de
-## stylo, en mm. Legere : elle aide a poser le zero sur une marque, elle ne colle
-## pas.
-static var AIMANT_REGLE: float = 11.0
+## Distance en dessous de laquelle le zero de la regle se cale de lui-meme sur une
+## marque, en mm. Le geste de base du niveau est « je cale le zero sur un repere
+## et je lis l'autre » : il doit se faire tout seul, donc l'aimant est franc.
+static var AIMANT_REGLE: float = 18.0
+
+## Ecart angulaire, en degres, en dessous duquel la regle se cale sur l'horizontale
+## ou la verticale. On ne s'en sert que droite ; il faut forcer pour l'incliner.
+static var AIMANT_ANGLE_REGLE: float = 9.0
 
 ## Rayon de la loupe, en mm de monde — elle a une taille physique comme le reste.
 static var RAYON_LOUPE: float = 39.0

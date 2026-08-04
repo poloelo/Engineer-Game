@@ -2,8 +2,7 @@
 #
 # Deposer `textures/masse_50g.png` suffit a habiller la masse de 50 g ;
 # `textures/masse.png` habille toutes celles qui n'ont pas leur fichier propre ;
-# `textures/crochet.png` habille le crochet. Sans fichier, on dessine le disque
-# fendu comme avant.
+# Sans fichier, on dessine le disque fendu comme avant.
 #
 # La texture est cadree sur le diametre de collision : un PNG carre tombe pile
 # sur la forme, sans reglage.
@@ -18,7 +17,6 @@ const SAISIE: Color = Color("6fd3ff")
 const PRETE: Color = Color("ffb454")
 
 var rayon: float = 11.0
-var crochet: bool = false
 var sachet: bool = false
 ## Part du sachet deja remplie, de 0 a 1.
 var remplissage: float = 0.0
@@ -45,8 +43,6 @@ func _ready() -> void:
 
 
 func _texture() -> Texture2D:
-	if crochet:
-		return Textures.charger("crochet")
 	if sachet:
 		return Textures.charger("sachet")
 	# `masse_50g` d'abord, `masse` ensuite : le fichier dedie gagne.
@@ -64,12 +60,6 @@ func _draw() -> void:
 		couleur = PRETE
 	elif saisie:
 		couleur = SAISIE
-
-	if crochet:
-		# Un S ouvert : la partie basse reste libre, c'est la qu'on accroche.
-		draw_arc(Vector2(0.0, -rayon * 0.45), rayon * 0.55, PI, TAU, 20, couleur, 1.25)
-		draw_arc(Vector2(0.0, rayon * 0.35), rayon * 0.62, -PI * 0.85, PI * 0.85, 24, couleur, 1.25)
-		return
 
 	if sachet:
 		_dessiner_sachet(couleur)

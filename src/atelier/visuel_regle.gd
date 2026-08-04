@@ -31,9 +31,14 @@ const MARGE_PATCH: int = 16
 var longueur: float = 200.0
 var largeur: float = 22.0
 var pas: float = 1.0
+var rayon_molette: float = 9.5
+var recul_molette: float = 11.0
 ## Une valeur de Regle.Prise : ce que le curseur ferait s'il cliquait.
+## 1 = deplacer, 2 = faire pivoter.
 var etat: int = 0
 var accroche: Vector2 = Vector2.INF
+## Vrai quand la regle est calee pile sur un quart de tour.
+var droite: bool = false
 
 var _patch: NinePatchRect = null
 
@@ -70,6 +75,7 @@ func _draw() -> void:
 		_dessiner_graduations()
 		_dessiner_zero()
 
+	_dessiner_molette()
 	_dessiner_prehension()
 
 	if accroche != Vector2.INF:
@@ -118,17 +124,31 @@ func _dessiner_zero() -> void:
 	)
 
 
-## Le retour de survol dit lequel des deux gestes va se produire.
-## 1 = translation, 2 = pivot autour de la fin, 3 = pivot autour du debut.
-func _dessiner_prehension() -> void:
-	if etat == 0:
-		return
-	if etat == 1:
-		draw_rect(Rect2(Vector2.ZERO, Vector2(longueur, largeur)), SURVOL, false, 0.75)
-		return
+## La molette de rotation. Ronde, moletee, posee hors du corps : elle ne
+## ressemble a aucune autre partie de la regle, donc on ne se trompe pas de zone.
+func _dessiner_molette() -> void:
+	var centre: Vector2 = Vector2(longueur + recul_molette, largeur * 0.5)
+	var couleur: Color = SURVOL if etat == 2 else BORD
+	draw_line(Vector2(longueur, largeur * 0.5), centre, couleur, 1.0)
+	draw_circle(centre, rayon_molette, CORPS)
+	draw_arc(centre, rayon_molette, 0.0, TAU, 26, couleur, 1.1)
+	for i: int in 10:
+		var angle: float = TAU * float(i) / 10.0
+		var direction: Vector2 = Vector2.from_angle(angle)
+		draw_line(
+			centre + direction * (rayon_molette * 0.55),
+			centre + direction * (rayon_molette * 0.95),
+			couleur,
+			0.55
+		)
+	# Un point plein au centre quand la regle est calee droite : on voit d'un
+	# coup d'oeil qu'on est pile sur l'horizontale ou la verticale.
+	if droite:
+		draw_circle(centre, rayon_molette * 0.3, SURVOL if etat == 2 else ZERO)
 
-	# Pivot : on marque le bout tenu par un arc, et l'appui par un point.
-	var tenu: Vector2 = Vector2(longueur, 0.0) if etat == 3 else Vector2.ZERO
-	var appui: Vector2 = Vector2.ZERO if etat == 3 else Vector2(longueur, 0.0)
-	draw_arc(tenu + Vector2(0.0, largeur * 0.5), 13.0, -PI * 0.75, PI * 0.25, 28, SURVOL, 1.0)
-	draw_circle(appui + Vector2(0.0, largeur * 0.5), 2.0, SURVOL)
+
+## Le retour de survol dit lequel des deux gestes va se produire.
+func _dessiner_prehension() -> void:
+	if etat != 1:
+		return
+	draw_rect(Rect2(Vector2.ZERO, Vector2(longueur, largeur)), SURVOL, false, 0.75)

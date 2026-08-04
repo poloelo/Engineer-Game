@@ -68,15 +68,65 @@ func contient(monde: Vector2) -> bool:
 	return rect().has_point(to_local(monde))
 
 
-## Le coup de poincon d'un etalon presse contre le papier : son chiffre reste
-## grave a cote de sa marque. Sans ca les traits sont anonymes et le releve n'est
-## pas une mesure.
-func tamponner(monde: Vector2, texte: String, hauteur_mm: float = 7.0) -> void:
-	if not contient(monde):
+## Le trait franc d'un coup de pointeau. Ses deux bouts entrent dans l'index :
+## c'est sur eux que le zero de la regle viendra se caler.
+func marquer_trait(monde_a: Vector2, monde_b: Vector2) -> void:
+	var a: Vector2 = to_local(monde_a)
+	var b: Vector2 = to_local(monde_b)
+	if not rect().has_point(a) and not rect().has_point(b):
 		return
-	var local: Vector2 = to_local(monde)
-	_faces[_face].graver(local, texte, hauteur_mm)
-	_index[_face].append(local)
+	_faces[_face].segment(a, b)
+	_index[_face].append(a)
+	_index[_face].append(b)
+
+
+## Le coup de poincon d'un etalon presse contre le papier : son chiffre reste
+## grave a cote de sa marque.
+##
+## Le chiffre SE COLLE A LA MARQUE LA PLUS PROCHE au lieu de se poser ou le
+## joueur a lache. Un chiffre pose dans le vide n'annote rien, et un chiffre
+## toujours decale a droite devient impossible a poser au bord droit du papier :
+## on choisit donc le cote qui tient sur la feuille.
+##
+## Sans marque a portee, on ne grave rien. Rend vrai si le chiffre est passe.
+func tamponner(monde: Vector2, texte: String, portee: float, hauteur_mm: float = 7.0) -> bool:
+	var marque: Vector2 = encre_proche(monde, portee)
+	if marque == Vector2.INF:
+		return false
+	# Le chiffre se pose apres le BOUT DROIT du trait, pas apres le bout le plus
+	# proche : cale sur le bout gauche il se serait ecrit par-dessus le trait.
+	var local: Vector2 = _bout_droit(to_local(marque))
+	# A droite si le chiffre y tient, a gauche sinon — sans quoi une marque
+	# proche du bord droit du papier serait impossible a annoter.
+	var largeur: float = float(texte.length()) * hauteur_mm * 0.62
+	var ou: Vector2 = local + Vector2(5.0, hauteur_mm * 0.4)
+	if ou.x + largeur > TAILLE.x - 3.0:
+		ou = _bout_gauche(to_local(marque)) - Vector2(5.0 + largeur, -hauteur_mm * 0.4)
+	_faces[_face].graver(ou, texte, hauteur_mm)
+	return true
+
+
+## Le point le plus a droite de la marque qui passe par [param point] : les deux
+## bouts d'un meme trait partagent leur hauteur.
+func _bout_droit(point: Vector2) -> Vector2:
+	var meilleur: Vector2 = point
+	for autre: Vector2 in _index[_face]:
+		if absf(autre.y - point.y) < 1.0 and autre.x > meilleur.x:
+			meilleur = autre
+	return meilleur
+
+
+func _bout_gauche(point: Vector2) -> Vector2:
+	var meilleur: Vector2 = point
+	for autre: Vector2 in _index[_face]:
+		if absf(autre.y - point.y) < 1.0 and autre.x < meilleur.x:
+			meilleur = autre
+	return meilleur
+
+
+## La marque la plus proche d'un point, ou INF. Sert au retour visuel du tampon.
+func marque_proche(monde: Vector2, portee: float) -> Vector2:
+	return encre_proche(monde, portee)
 
 
 ## Depose un point sous la pointe, si elle touche le papier.

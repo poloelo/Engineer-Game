@@ -74,6 +74,11 @@ func _process(delta: float) -> void:
 # --- Manipulation ------------------------------------------------------------
 
 
+## La zone sous un point, sans rien saisir. Sert au curseur.
+func zone_sous(ou: Vector2) -> int:
+	return _zone(ou)
+
+
 func _zone(ou: Vector2) -> int:
 	var local: Vector2 = to_local(ou)
 	if absf(local.x) > LARGEUR * 0.7 or absf(local.y) > HAUTEUR * 0.62:

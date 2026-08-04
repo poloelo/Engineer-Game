@@ -1,13 +1,24 @@
 # Le niveau 1, et pour l'instant tout le jeu.
 #
 # Une commande : trois sachets de poudre a 56, 89 et 143 g. La balance de
-# l'atelier a un pas de 100 g, elle ne sert a rien. Le joueur a un ressort, un
-# crochet, des masses etalons, un stylo, une feuille, une regle et une loupe.
+# l'atelier a un pas de 100 g, elle ne sert a rien. Le joueur a un ressort, des
+# masses etalons, des sachets, un pointeau, une feuille, une regle et un pot.
 #
-# Il clipse le stylo au crochet et marque son zero — crochet nu, rien accroche.
-# Il accroche un etalon, marque, presse l'etalon contre le papier pour graver son
-# chiffre a cote du trait. Il recommence. LA FEUILLE NE BOUGE PAS : les marques
-# s'empilent sur une meme verticale et forment un cadran, pas un nuage de points.
+# UNE SEULE ACTION PAR ZONE, ET LE SURVOL LA DIT. C'est la regle qui gouverne
+# toute la manipulation : si le joueur doit deviner ce qu'un clic va faire, c'est
+# rate. Chaque objet a des zones nettes, visuellement distinctes, qui s'allument
+# au survol, et le curseur change avec elles.
+#
+# Il clipse le pointeau au bout du ressort, accroche le SACHET VIDE et frappe :
+# un trait franc marque son zero. Les graduations vaudront donc pour le contenu,
+# pas pour contenu + emballage — c'est le geste de n'importe qui se servant d'une
+# balance, et c'est la que le piege se cache : marquer son zero sur le ressort nu
+# fausse tout de la masse du sachet.
+#
+# Puis il pend un etalon sous le sachet, frappe, et presse l'etalon contre le
+# papier pour graver son chiffre a cote du trait. LA FEUILLE NE BOUGE PAS : les
+# marques s'empilent sur une meme verticale et forment un cadran, pas un nuage de
+# points.
 #
 # Verser jusqu'a une marque ne demande alors ni regle ni calcul. La regle et le
 # compas ne servent qu'a fabriquer les graduations qui manquent — 56, 89, 143 —
@@ -38,9 +49,8 @@ const Reglages: GDScript = preload("res://src/atelier/reglages.gd")
 const Marqueurs: GDScript = preload("res://src/atelier/marqueurs.gd")
 const Masse: GDScript = preload("res://src/atelier/masse.gd")
 const Feuille: GDScript = preload("res://src/atelier/feuille.gd")
-const Stylo: GDScript = preload("res://src/atelier/stylo.gd")
 const Regle: GDScript = preload("res://src/atelier/regle.gd")
-const Loupe: GDScript = preload("res://src/atelier/loupe.gd")
+const Pointeau: GDScript = preload("res://src/atelier/pointeau.gd")
 const Verseuse: GDScript = preload("res://src/atelier/verseuse.gd")
 const Enonce: GDScript = preload("res://src/atelier/enonce.gd")
 const Plateau: GDScript = preload("res://src/atelier/plateau.gd")
@@ -54,7 +64,7 @@ const TRAIT_EFFACE: Color = Color(0.90, 0.94, 0.97, 0.45)
 const PRETE: Color = Color("ffb454")
 
 ## Point de suspension du ressort, en mm.
-const ANCRE: Vector2 = Vector2(350.0, 34.0)
+const ANCRE: Vector2 = Vector2(350.0, 28.0)
 ## Hauteur du plan de travail, en mm. Basse expres : a pleine charge, le ressort
 ## et ce qui pend dessous doivent tenir au-dessus de l'etabli.
 const SOL: float = 336.0
@@ -79,12 +89,12 @@ const LONGUEUR_MIN: float = 12.0
 ## fines entre deux marques larges.
 const MASSES_G: Array[float] = [10.0, 20.0, 50.0, 100.0]
 
-## Tolerance d'acceptation d'un sachet, en grammes. A un millimetre par gramme,
-## 2 g valent 2 mm sur le cadran : c'est lisible a l'oeil, serre a verser.
+## Tolerance d'acceptation d'un sachet, en grammes. A 1,3728 mm par gramme,
+## 2 g valent 2,75 mm sur le cadran : c'est lisible a l'oeil, serre a verser.
 const TOLERANCE_G: float = 2.0
 
-## Masse a vide d'un sachet, en grammes. Elle pese, comme le crochet : c'est le
-## meme piege, une deuxieme fois.
+## Masse a vide d'un sachet, en grammes. C'EST LE PIEGE DU NIVEAU : le zero se
+## marque sachet vide accroche, sinon on se trompe de cette masse-la.
 const TARE_SACHET: float = 12.0
 
 ## Nombre de sachets fournis : autant que la commande en demande.
@@ -95,6 +105,8 @@ const DUREE_TAMPON: float = 0.45
 ## Vitesse du curseur en dessous de laquelle on considere qu'on appuie, en mm/s.
 ## Au-dessus, on est en train de deplacer la masse, pas de tamponner.
 const VITESSE_TAMPON: float = 22.0
+## Distance a laquelle un poincon trouve la marque qu'il annote, en mm.
+const PORTEE_TAMPON: float = 20.0
 
 # --- Etat du ressort, libre dans le plan -------------------------------------
 
@@ -112,11 +124,11 @@ var _libres: Array[RigidBody2D] = []
 var _directions: Array[Vector2] = []
 
 var _feuille: Node2D = null
-var _stylo: Node2D = null
+var _pointeau: Node2D = null
 var _regle: Node2D = null
-var _loupe: Node2D = null
 var _ressort: Line2D = null
 var _bout_ressort: Marker2D = null
+var _porte_pointeau: Marker2D = null
 var _verseuse: Node2D = null
 var _plateau: Node2D = null
 var _enonce: Node2D = null
@@ -129,9 +141,9 @@ var _offset_saisie: Vector2 = Vector2.ZERO
 var _cible: Vector2 = Vector2.ZERO
 var _point_aimant: Vector2 = Vector2.ZERO
 var _aimant_actif: bool = false
-## Ce que le curseur traine qui n'est pas une masse : la feuille, le stylo, la regle.
+## Ce que le curseur traine qui n'est pas une masse : le pointeau, la regle, le pot.
 var _outil_saisi: Node2D = null
-var _clipsage_vise: RigidBody2D = null
+var _clipsage_vise: Node2D = null
 ## La bouche vers laquelle la poudre coule en ce moment, pour dessiner le filet.
 var _cible_versage: Marker2D = null
 ## Ou la poudre deborde d'un sachet plein, pour que ca se voie.
@@ -146,7 +158,6 @@ func _ready() -> void:
 	_construire_camera()
 	_construire_etabli()
 	_construire_instruments()
-	_construire_crochet()
 	_construire_masses()
 	_construire_poudre()
 	add_child(PanneauReglages.new())
@@ -217,23 +228,28 @@ func _construire_instruments() -> void:
 	# L'extremite du ressort est un marqueur comme les autres : c'est a lui que la
 	# premiere masse de la chaine vient se pendre.
 	_bout_ressort = Marqueurs.poser(self, "extremite_ressort", _extremite, Marqueurs.SUPPORT)
+	# Le pointeau se clipse ICI ET NULLE PART AILLEURS. Une seule cible possible,
+	# donc aucune ambiguite : peu importe ce qui pend, les marques se referent
+	# toujours a la meme extremite et restent comparables entre elles.
+	_porte_pointeau = Marqueurs.poser(
+		self, "porte_pointeau", _extremite, Marqueurs.PORTE_STYLO
+	)
 
 	_regle = Regle.new()
 	_regle.position = Vector2(215.0, 264.0)
 	_regle.z_index = 6
 	add_child(_regle)
 
-	_stylo = Stylo.new()
-	# A gauche des etalons : sa zone de prehension mordait sur le poids de 150 g,
-	# et attraper le poids attrapait le stylo.
-	_stylo.position = Vector2(270.0, SOL - 15.0)
-	_stylo.z_index = 7
-	add_child(_stylo)
+	_pointeau = Pointeau.new()
+	# A gauche des etalons : sa zone de prehension mordrait sinon sur un poids.
+	_pointeau.position = Vector2(262.0, SOL - 12.0)
+	_pointeau.z_index = 7
+	add_child(_pointeau)
 
-	_loupe = Loupe.new()
-	_loupe.position = Vector2(505.0, 150.0)
-	_loupe.z_index = 12
-	add_child(_loupe)
+	# La loupe n'est plus du kit : a cette raideur, lire au millimetre suffit et
+	# ne demande aucun grossissement. Elle reviendra au niveau 6, quand le bruit
+	# de mesure rendra la precision fine reellement necessaire. Le code reste
+	# (loupe.gd), il ne coute rien tant qu'on ne l'instancie pas.
 
 	_enonce = Enonce.new()
 	_enonce.position = Vector2(10.0, 40.0)
@@ -247,21 +263,6 @@ func _construire_instruments() -> void:
 	add_child(_plateau)
 
 
-## Le crochet est une piece reelle du montage, pas un poids indetachable ajoute
-## pour compenser. Il pese 8 g, il etire le ressort en permanence, il balance
-## quand on le pousse et il oscille quand on retire une masse.
-##
-## C'est le piege du niveau 1 : le zero du joueur n'est pas la ou il croit, parce
-## que son instrument pese deja quelque chose avant qu'il n'ait rien accroche.
-## Et comme il se devisse — on le prend, on le tire, le ressort remonte de 30 mm
-## sous les yeux — le geste qui resout le niveau existe physiquement.
-func _construire_crochet() -> void:
-	var crochet: RigidBody2D = _nouvelle_masse(
-		Reglages.MASSE_CROCHET, 8.0, ANCRE + Vector2(0.0, 60.0), true
-	)
-	_accrocher(crochet, false)
-
-
 func _construire_masses() -> void:
 	var x: float = 420.0
 	var rang: int = 0
@@ -269,7 +270,7 @@ func _construire_masses() -> void:
 		var rayon: float = _rayon_de(m)
 		# Sa valeur est gravee en relief : presse contre le papier, il la tamponne.
 		_nouvelle_masse(
-			m, rayon, Vector2(x, SOL - rayon - 1.0 - float(rang) * 60.0), false, false, true
+			m, rayon, Vector2(x, SOL - rayon - 1.0 - float(rang) * 60.0), false, true
 		)
 		x += rayon * 2.0 + 6.0
 		if x > 625.0:
@@ -288,7 +289,7 @@ func _construire_poudre() -> void:
 
 	for i: int in SACHETS:
 		_nouvelle_masse(
-			TARE_SACHET, 16.0, Vector2(150.0 + float(i) * 38.0, SOL - 17.0), false, true
+			TARE_SACHET, 16.0, Vector2(150.0 + float(i) * 38.0, SOL - 17.0), true
 		)
 
 
@@ -308,7 +309,6 @@ func _nouvelle_masse(
 	masse_g: float,
 	rayon: float,
 	ou: Vector2,
-	est_crochet: bool = false,
 	est_sachet: bool = false,
 	est_poincon: bool = false
 ) -> RigidBody2D:
@@ -316,7 +316,6 @@ func _nouvelle_masse(
 	corps.rayon = rayon
 	corps.mass = masse_g
 	corps.position = ou
-	corps.crochet = est_crochet
 	corps.sachet = est_sachet
 	corps.poincon = est_poincon
 	add_child(corps)
@@ -336,6 +335,7 @@ func _physics_process(delta: float) -> void:
 		_integrer_ressort(delta)
 
 	_bout_ressort.position = _extremite
+	_porte_pointeau.position = _extremite
 	_ressort.mettre_a_jour(ANCRE, _extremite, _vitesse)
 	_poser_la_chaine(delta)
 	_traine_au_curseur()
@@ -344,7 +344,7 @@ func _physics_process(delta: float) -> void:
 	_verser(delta)
 	_plateau.maintenir()
 	_presser_le_poincon(delta)
-	_animer_stylo()
+	_animer_pointeau()
 	_cible_precedente = _cible
 
 	_butee_angle = lerpf(_butee_angle, -1.15 if _butee else 0.0, 1.0 - pow(0.001, delta))
@@ -590,42 +590,65 @@ func _presser_le_poincon(delta: float) -> void:
 		_tampon_pose = false
 		return
 
+	# PRIORITE STRICTE : pres du point d'accroche, on accroche ; ailleurs sur le
+	# papier, on annote. Les deux zones se recouvrent dans l'espace — les marques
+	# tombent juste au-dessus du crochet — et sans cette regle, tamponner une
+	# marque rependait la masse au ressort. L'anneau d'aimantation est deja
+	# dessine : le joueur voit laquelle des deux actions est armee.
+	if _aimant_actif:
+		_pression = 0.0
+		_tampon_pose = false
+		return
+
+	# TOUT SE JUGE SUR LE POINTEUR, jamais sur la masse. Une masse lourde flotte
+	# loin du curseur — le poids est compense aux trois quarts, donc un poids de
+	# 100 g plane 85 mm au-dessus du point vise — et la tester ferait rater la
+	# marque que le joueur vise. C'est la meme raison qu'a l'aimantation du
+	# crochet et qu'au depot sur le plateau.
+	var vise: Vector2 = _cible - _offset_saisie
 	var vitesse: float = (_cible - _cible_precedente).length() / maxf(delta, 0.0001)
-	if not _feuille.contient(_saisie.global_position) or vitesse > VITESSE_TAMPON:
+	if not _feuille.contient(vise) or vitesse > VITESSE_TAMPON:
 		_pression = 0.0
 		_tampon_pose = false
 		return
 	if _tampon_pose:
 		return
 
+	# Sans marque a portee, on n'arme meme pas : un chiffre pose dans le vide
+	# n'annote rien. L'arc ne se remplit que quand le tampon a quelque chose a
+	# annoter, ce qui dit au joueur ou amener sa masse.
+	if _feuille.marque_proche(vise, PORTEE_TAMPON) == Vector2.INF:
+		_pression = 0.0
+		return
+
 	_pression += delta
 	if _pression < DUREE_TAMPON:
 		return
-	# Le chiffre se pose a cote de la masse, pas dessous : on doit pouvoir viser
-	# le trait avec le bord du poincon et lire le chiffre a cote.
-	_feuille.tamponner(
-		_saisie.global_position + Vector2(_saisie.rayon + 6.0, 2.5),
-		"%d" % int(round(_saisie.mass))
+	# Le chiffre SE COLLE A LA MARQUE, il ne se pose pas ou la main a lache.
+	_tampon_pose = _feuille.tamponner(
+		vise, "%d" % int(round(_saisie.mass)), PORTEE_TAMPON
 	)
-	_tampon_pose = true
 
 
-# --- Stylo -------------------------------------------------------------------
+# --- Pointeau ----------------------------------------------------------------
 
 
-func _animer_stylo() -> void:
-	if _stylo == null:
+## Le pointeau suit ce a quoi il est clipse. Il ne trace RIEN tout seul : il ne
+## marque que quand on frappe sa tete. Un instrument qui ecrit en permanence
+## laisse une trainee, pas des reperes.
+func _animer_pointeau() -> void:
+	if _pointeau == null:
 		return
-	if _stylo.tenu:
-		_stylo.global_position = _cible - _offset_saisie
-	elif _stylo.support != null and is_instance_valid(_stylo.support):
-		_stylo.global_position = _stylo.support.global_position + _stylo.decalage
+	if _pointeau.tenu:
+		_pointeau.global_position = _cible - _offset_saisie
+	elif _pointeau.support != null and is_instance_valid(_pointeau.support):
+		_pointeau.global_position = _pointeau.support.global_position + _pointeau.decalage
 
-	# Le stylo ne trace que si la pointe est baissee et qu'elle touche la feuille.
-	if _stylo.pointe_baissee:
-		_feuille.tracer(_stylo.pointe())
-	else:
-		_feuille.lever()
+
+## Un coup sec : un trait franc a la hauteur courante, et rien de plus.
+func _frapper() -> void:
+	var bouts: Array[Vector2] = _pointeau.frapper()
+	_feuille.marquer_trait(bouts[0], bouts[1])
 
 
 # --- Accrochage --------------------------------------------------------------
@@ -657,8 +680,6 @@ func _decrocher_a_partir_de(index: int) -> void:
 		corps.linear_velocity = vitesse
 		corps.rafraichir()
 		_libres.append(corps)
-		if _stylo != null and _stylo.support == corps:
-			_stylo.declipser()
 	_directions.resize(_chaine.size())
 	_saisie = null
 	_saisie_index = -1
@@ -694,12 +715,8 @@ func _unhandled_input(evenement: InputEvent) -> void:
 				_saisir(get_global_mouse_position())
 			else:
 				_lacher()
-		elif evenement.button_index == MOUSE_BUTTON_RIGHT and evenement.pressed:
-			_stylo.basculer_pointe()
 	elif evenement is InputEventKey and evenement.pressed and not evenement.echo:
 		match evenement.keycode:
-			KEY_SPACE:
-				_stylo.basculer_pointe()
 			KEY_R:
 				_ranger()
 			KEY_F:
@@ -713,10 +730,10 @@ func _unhandled_input(evenement: InputEvent) -> void:
 
 
 func _saisir(ou: Vector2) -> void:
-	# Ordre de priorite : les instruments sont devant, la feuille est le fond.
-	if _loupe.attraper(ou):
-		_outil_saisi = _loupe
-		_offset_saisie = ou - _loupe.global_position
+	# La tete du pointeau ne se traine pas : elle frappe, et c'est tout ce qu'elle
+	# fait. Une zone, une action.
+	if _pointeau.zone(ou) == Pointeau.Prise.TETE:
+		_frapper()
 		return
 
 	if _regle.attraper(ou):
@@ -724,9 +741,9 @@ func _saisir(ou: Vector2) -> void:
 		_offset_saisie = ou - _regle.global_position
 		return
 
-	if _stylo.attraper(ou):
-		_outil_saisi = _stylo
-		_offset_saisie = ou - _stylo.global_position
+	if _pointeau.attraper(ou):
+		_outil_saisi = _pointeau
+		_offset_saisie = ou - _pointeau.global_position
 		return
 
 	if _verseuse.attraper(ou):
@@ -762,8 +779,8 @@ func _saisir(ou: Vector2) -> void:
 
 func _lacher() -> void:
 	if _outil_saisi != null:
-		if _outil_saisi == _stylo and _clipsage_vise != null:
-			_stylo.clipser(_clipsage_vise)
+		if _outil_saisi == _pointeau and _clipsage_vise != null:
+			_pointeau.clipser(_clipsage_vise)
 		_outil_saisi.call("relacher")
 		_outil_saisi = null
 		_clipsage_vise = null
@@ -832,8 +849,9 @@ func _process(_delta: float) -> void:
 			var vise: Vector2 = ou - _offset_saisie
 			_regle.deplacer(vise, _feuille.encre_proche(vise, Reglages.AIMANT_REGLE))
 		else:
-			# En pivot, c'est le bout tenu qui cherche une marque.
-			_regle.pivoter(ou, _feuille.encre_proche(ou, Reglages.AIMANT_REGLE))
+			# En pivot, le zero ne bouge pas : c'est lui qu'on a cale sur une
+			# marque, il n'est pas question qu'il parte.
+			_regle.pivoter(ou)
 	elif _outil_saisi == _verseuse:
 		if _verseuse.prise == Verseuse.Prise.CORPS:
 			_verseuse.global_position = ou - _offset_saisie
@@ -841,16 +859,16 @@ func _process(_delta: float) -> void:
 			# On tient la poignee : le pot bascule vers le curseur, et il coule
 			# tant qu'on tient. Relacher le redresse.
 			_verseuse.incliner(ou)
-	elif _outil_saisi == _loupe:
-		_loupe.global_position = ou - _offset_saisie
-	elif _outil_saisi == _stylo:
-		# Ou le stylo se clipsera si on lache maintenant.
+	elif _outil_saisi == _pointeau:
+		# Ou le pointeau se clipsera si on lache maintenant.
 		_clipsage_vise = _cible_de_clipsage(ou)
-		_stylo.definir_vise(_clipsage_vise != null)
+		_pointeau.definir_vise(_clipsage_vise != null)
 
 	_regle.definir_survol(ou)
-	_loupe.definir_survol(ou)
 	_verseuse.definir_survol(ou)
+	_pointeau.definir_survol(ou)
+
+	_regler_curseur(ou)
 
 	# Le creux ou le sachet tenu tomberait si on lachait maintenant.
 	var vise: int = -1
@@ -859,14 +877,44 @@ func _process(_delta: float) -> void:
 	_plateau.definir_vise(vise)
 
 
-## Le marqueur porte-stylo le plus proche du pointeur, dans le rayon de clipsage.
-## Rien n'est code en dur : chaque objet expose ses points d'attache et le
-## clipsage prend le plus proche qui soit compatible.
-func _cible_de_clipsage(ou: Vector2) -> RigidBody2D:
-	var marqueur: Marker2D = Marqueurs.plus_proche(
-		_chaine + _libres, ou, Marqueurs.PORTE_STYLO, Reglages.RAYON_CLIPSAGE
+## Le curseur annonce ce qu'un clic ferait ici. C'est la moitie de la regle
+## « une action par zone » : la zone s'eclaire ET le curseur change. L'autre
+## moitie est le dessin de chaque objet, qui distingue ses zones a l'oeil.
+func _regler_curseur(ou: Vector2) -> void:
+	if _outil_saisi != null or _saisie != null:
+		Input.set_default_cursor_shape(Input.CURSOR_DRAG)
+		return
+	Input.set_default_cursor_shape(
+		Input.CURSOR_POINTING_HAND if _quelque_chose_sous(ou) else Input.CURSOR_ARROW
 	)
-	return null if marqueur == null else marqueur.get_parent() as RigidBody2D
+
+
+## Y a-t-il quoi que ce soit d'actionnable sous le pointeur ?
+func _quelque_chose_sous(ou: Vector2) -> bool:
+	if _pointeau.zone(ou) != Pointeau.Prise.AUCUNE:
+		return true
+	if _regle.zone_sous(ou) != Regle.Prise.AUCUNE:
+		return true
+	if _verseuse.zone_sous(ou) != Verseuse.Prise.AUCUNE:
+		return true
+	if ou.distance_to(_pivot_butee()) < 13.0:
+		return true
+	for corps: RigidBody2D in _chaine + _libres:
+		if ou.distance_to(corps.global_position) < corps.rayon + 3.0:
+			return true
+	return false
+
+
+## Le point d'attache du pointeau : le bout du ressort, et lui seul.
+##
+## Une seule cible possible, donc aucune ambiguite. Les masses exposaient elles
+## aussi un porte-outil, et le pointeau pouvait se clipser sur n'importe laquelle
+## — les marques changeaient alors de reference d'un releve a l'autre et
+## devenaient incomparables, sans que rien ne le signale.
+func _cible_de_clipsage(ou: Vector2) -> Node2D:
+	if ou.distance_to(_porte_pointeau.global_position) > Reglages.RAYON_CLIPSAGE:
+		return null
+	return _porte_pointeau
 
 
 # --- Dessin ------------------------------------------------------------------
@@ -881,9 +929,7 @@ func _draw() -> void:
 	if _aimant_actif:
 		_dessiner_aimantation()
 	if _clipsage_vise != null:
-		draw_arc(
-			_clipsage_vise.global_position, _clipsage_vise.rayon + 4.5, 0.0, TAU, 32, PRETE, 0.75
-		)
+		draw_arc(_clipsage_vise.global_position, 9.0, 0.0, TAU, 24, PRETE, 0.9)
 	_dessiner_pression()
 	if _debordement != Vector2.INF:
 		# La poudre qui deborde tombe par terre. Elle est perdue, et ca se voit.
@@ -897,7 +943,7 @@ func _dessiner_pression() -> void:
 		return
 	var part: float = clampf(_pression / DUREE_TAMPON, 0.0, 1.0)
 	draw_arc(
-		_saisie.global_position,
+		_cible - _offset_saisie,
 		_saisie.rayon + 3.5,
 		-PI * 0.5,
 		-PI * 0.5 + TAU * part,

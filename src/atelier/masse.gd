@@ -4,14 +4,15 @@
 # Le visuel est un enfant remplacable (visuel_masse.gd) : il prend une texture si
 # on en a depose une, sinon il dessine le disque fendu.
 #
-# Le sachet est une masse comme les autres, avec `sachet = true` : il pend au
-# crochet et sa masse AUGMENTE quand on verse dedans. Rien d'autre a prevoir —
+# Le sachet est une masse comme les autres, avec `sachet = true` : il pend au bout
+# du ressort et sa masse AUGMENTE quand on verse dedans. Rien d'autre a prevoir —
 # la chaine somme les masses, donc le ressort s'allonge tout seul.
 #
-# Le crochet est une masse comme les autres, avec `crochet = true` : il pend au
-# bout du ressort en permanence, il l'etire de 30 mm a lui tout seul, il balance
-# quand on le pousse et il oscille quand on retire un poids. On peut le devisser
-# comme n'importe quelle masse — et c'est le geste qui resout le niveau 1.
+# C'EST LUI QUI PORTE LE PIEGE DU NIVEAU, depuis que le crochet a disparu. On
+# accroche le sachet vide et on marque son zero la : les graduations valent alors
+# pour le contenu, pas pour contenu + emballage. C'est le geste de n'importe qui
+# se servant d'une balance, et le piege reste entier — un joueur qui marque son
+# zero sur le ressort nu se trompe de la masse du sachet, et rien ne le lui dira.
 extends RigidBody2D
 
 const Reglages: GDScript = preload("res://src/atelier/reglages.gd")
@@ -20,7 +21,6 @@ const VisuelMasse: GDScript = preload("res://src/atelier/visuel_masse.gd")
 
 ## Rayon en mm. Il sert a la collision et a la prehension, pas au dessin.
 var rayon: float = 11.0
-var crochet: bool = false
 ## Un contenant qu'on remplit. Sa masse est sa tare plus son contenu.
 var sachet: bool = false
 ## Un etalon porte sa valeur gravee en relief : presse contre le papier, il y
@@ -64,7 +64,6 @@ func _ready() -> void:
 	# est la ou pend la masse suivante.
 	Marqueurs.poser(self, "crochet", Vector2(0.0, -rayon - 3.5), Marqueurs.SUSPENSION)
 	Marqueurs.poser(self, "crochet_bas", Vector2(0.0, rayon), Marqueurs.SUPPORT)
-	Marqueurs.poser(self, "porte_stylo", Vector2.ZERO, Marqueurs.PORTE_STYLO)
 	if sachet:
 		# La bouche : le point ou la poudre tombe quand on verse au-dessus.
 		Marqueurs.poser(self, "bouche", Vector2(0.0, -rayon), Marqueurs.RECEPTACLE)
@@ -74,7 +73,6 @@ func _ready() -> void:
 
 	_visuel = VisuelMasse.new()
 	_visuel.rayon = rayon
-	_visuel.crochet = crochet
 	_visuel.sachet = sachet
 	_visuel.masse_g = mass
 	add_child(_visuel)
@@ -86,8 +84,6 @@ func _physics_process(_delta: float) -> void:
 	angular_damp = Reglages.FREIN_ROULEMENT
 	physics_material_override.bounce = Reglages.REBOND
 	physics_material_override.friction = Reglages.FRICTION
-	if crochet:
-		mass = Reglages.MASSE_CROCHET
 
 
 ## Verse [param grammes] dans le sachet. Rend ce qui est reellement entre : un
