@@ -132,6 +132,16 @@ func graver(local_mm: Vector2, texte: String, hauteur_mm: float) -> void:
 	_vue.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
+## Un trait franc d'un bout a l'autre, d'un seul coup. C'est le coup de pointeau :
+## il ne depend pas du trace precedent et ne relie rien.
+func segment(a_mm: Vector2, b_mm: Vector2) -> void:
+	_trait.en_attente.append(
+		PackedVector2Array([a_mm * resolution, b_mm * resolution])
+	)
+	_trait.queue_redraw()
+	_vue.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
 ## La pointe se leve : le trait suivant repartira ailleurs, sans relier les deux.
 func lever() -> void:
 	_dernier = Vector2.INF

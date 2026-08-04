@@ -59,11 +59,10 @@ func _input(evenement: InputEvent) -> void:
 func _lignes() -> Array:
 	return [
 		["ECHELLE_TEMPS", "Echelle de temps", 0.1, 2.0],
-		["RAIDEUR", "Raideur ressort (g/s2)", 2000.0, 24000.0],
+		["RAIDEUR", "Raideur ressort (g/s2)", 2000.0, 20000.0],
 		["AMORTISSEMENT", "Amortissement axial", 0.0, 200.0],
 		["AMORTISSEMENT_LATERAL", "Amortissement lateral (1/s)", 0.0, 12.0],
 		["LONGUEUR_REPOS", "Longueur au repos (mm)", 20.0, 120.0],
-		["MASSE_CROCHET", "Masse du crochet (g)", 0.0, 40.0],
 		["MASSE_RESSORT", "Masse du ressort (g)", 0.0, 60.0],
 		["RAIDEUR_CURSEUR", "Rappel curseur (g/s2)", 1000.0, 25000.0],
 		["AMORTISSEMENT_CURSEUR", "Amortissement curseur", 10.0, 320.0],
@@ -83,9 +82,8 @@ func _lignes() -> Array:
 		["SEUIL_REPOS", "Seuil de repos (mm)", 0.0, 5.0],
 		["RAYON_CLIPSAGE", "Rayon de clipsage (mm)", 8.0, 65.0],
 		["PAS_TRACE", "Finesse de la trace (mm)", 0.2, 5.0],
-		["AIMANT_REGLE", "Aimant de la regle (mm)", 2.0, 35.0],
-		["RAYON_LOUPE", "Rayon de la loupe (mm)", 15.0, 80.0],
-		["GROSSISSEMENT_LOUPE", "Grossissement", 1.5, 7.0],
+		["AIMANT_REGLE", "Aimant du zero (mm)", 2.0, 40.0],
+		["AIMANT_ANGLE_REGLE", "Aimant d'angle (deg)", 0.0, 25.0],
 	]
 
 
